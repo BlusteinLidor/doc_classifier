@@ -1,0 +1,12 @@
+# Python AI Development Rules
+- Use type hints for all function signatures.
+- Favor Pydantic V2 for all data validation and AI schemas.
+- Use `logger` instead of `print` for better debugging.
+- Keep the UI logic (Streamlit) separate from the business logic (OpenAI/PDF Parsing).
+- Follow PEP 8 style guidelines.
+- For OpenAI calls, always use the latest SDK syntax (OpenAI class instance, not global methods).
+- Ensure all sensitive keys are loaded via `python-dotenv`.
+- **Hebrew/RTL Handling:**
+  - Always use `encoding='utf-8'` when reading or writing files.
+  - For Streamlit, use custom CSS to support RTL directionality when displaying Hebrew content (e.g., `st.markdown('<div style="direction: rtl;">...</div>')`).
+  - Ensure the AI System Prompt specifies that the output values (e.g., Company names, addresses) should be in the original language found in the document.
