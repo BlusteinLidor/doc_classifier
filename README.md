@@ -2,7 +2,9 @@
 
 Classify invoice/contract PDFs and extract structured fields (English / Hebrew) using OpenAI structured outputs and Streamlit.
 
-**Portfolio demo** — see [DEMO.md](DEMO.md) for the public happy path, secrets, and Streamlit Cloud deploy.
+**Live portfolio demo:** https://doc-classifier-production-8376.up.railway.app  
+
+See [DEMO.md](DEMO.md) for the happy path, secrets, and deploy notes. Handoff copy for the portfolio site is in [HANDOFF.md](HANDOFF.md).
 
 ## Setup
 

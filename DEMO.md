@@ -4,7 +4,9 @@ Public Streamlit demo that classifies invoices vs contracts and extracts structu
 
 ## Try it
 
-1. Open the public URL (see repo README or portfolio Selected Work once wired).
+**Live demo:** https://doc-classifier-production-8376.up.railway.app
+
+1. Open the URL above.
 2. Click one of the **sample** buttons (English invoice, Hebrew invoice, or English contract).
 3. Wait for classification + extracted fields (usually under a minute).
 
@@ -39,7 +41,19 @@ Streamlit secrets example:
 OPENAI_API_KEY = "sk-..."
 ```
 
-## Deploy (Streamlit Community Cloud)
+## Deploy
+
+### Live host (Railway)
+
+The public portfolio demo currently runs on Railway:
+
+https://doc-classifier-production-8376.up.railway.app
+
+- Dockerfile + `railway.toml` in the repo
+- Set `OPENAI_API_KEY` as a Railway service variable
+- Redeploy after secret changes: `railway redeploy`
+
+### Streamlit Community Cloud (optional alternate)
 
 One-click (pre-filled):  
 [Deploy on Streamlit Community Cloud](https://share.streamlit.io/deploy?repository=BlusteinLidor/doc_classifier&branch=master&mainModule=app/streamlit_app.py)
@@ -56,12 +70,6 @@ Manual steps:
    ```
 
 5. Deploy. Public HTTPS URL looks like `https://<app-name>.streamlit.app`.
-
-After deploy, confirm with:
-
-```text
-https://share.streamlit.io/api/v2/apps/disambiguate?path=BlusteinLidor/doc_classifier/master/app/streamlit_app.py
-```
 
 Demo limits (cost / abuse): max **3** PDFs per run, **5 MB** each.
 

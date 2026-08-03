@@ -1,12 +1,11 @@
 # Portfolio handoff — document-classifier
 
-Fill `demoUrl` after Streamlit Community Cloud deploy completes
-(see [DEMO.md](DEMO.md) one-click link). Then paste into the portfolio
-`lib/i18n/he.ts` / `lib/i18n/en.ts` case studies.
+Paste into the portfolio `lib/i18n/he.ts` / `lib/i18n/en.ts` case studies
+(replace the placeholder study and set `href` / `hrefLabel` to the live demo).
 
 ```text
 id: document-classifier
-demoUrl:
+demoUrl: https://doc-classifier-production-8376.up.railway.app
 title_en: AI Document Intelligence
 title_he: בינה מלאכותית למסמכים
 problem_en: Small businesses bury invoices and contracts in shared drives — finding the right file or key fields takes minutes every time.
