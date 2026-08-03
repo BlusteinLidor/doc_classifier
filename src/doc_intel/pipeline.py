@@ -34,7 +34,7 @@ def _get_api_key() -> str:
     key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not key:
         raise OpenAIClientError(
-            "Missing OPENAI_API_KEY. Add it to your .env file in the project root."
+            "Missing OPENAI_API_KEY. Set it in .env locally or in Streamlit secrets."
         )
     return key
 

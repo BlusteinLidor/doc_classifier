@@ -1,6 +1,8 @@
-# AI Document Intelligence PoC
+# AI Document Intelligence
 
-Extract structured data from invoice/contract PDFs using OpenAI structured outputs and Streamlit.
+Classify invoice/contract PDFs and extract structured fields (English / Hebrew) using OpenAI structured outputs and Streamlit.
+
+**Portfolio demo** — see [DEMO.md](DEMO.md) for the public happy path, secrets, and Streamlit Cloud deploy.
 
 ## Setup
 
@@ -19,4 +21,4 @@ Extract structured data from invoice/contract PDFs using OpenAI structured outpu
 streamlit run app/streamlit_app.py
 ```
 
-If imports fail without editable install, run from the project root with `pip install -e .` first.
+Sample PDFs live in `samples/`. Regenerate with `python scripts/generate_samples.py`.
