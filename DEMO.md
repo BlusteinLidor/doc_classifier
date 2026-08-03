@@ -41,11 +41,27 @@ OPENAI_API_KEY = "sk-..."
 
 ## Deploy (Streamlit Community Cloud)
 
-1. Push this repo to GitHub.
-2. At [share.streamlit.io](https://share.streamlit.io) → **New app**.
-3. Select the repo, branch `master` (or `main`), main file path: `app/streamlit_app.py`.
-4. Add `OPENAI_API_KEY` under Secrets.
+One-click (pre-filled):  
+[Deploy on Streamlit Community Cloud](https://share.streamlit.io/deploy?repository=BlusteinLidor/doc_classifier&branch=master&mainModule=app/streamlit_app.py)
+
+Manual steps:
+
+1. Repo is on GitHub: `BlusteinLidor/doc_classifier` (public).
+2. Open the link above (or [share.streamlit.io](https://share.streamlit.io) → **Create app**).
+3. Confirm branch `master`, main file `app/streamlit_app.py`.
+4. **Secrets** (required for classify/extract to work):
+
+   ```toml
+   OPENAI_API_KEY = "sk-..."
+   ```
+
 5. Deploy. Public HTTPS URL looks like `https://<app-name>.streamlit.app`.
+
+After deploy, confirm with:
+
+```text
+https://share.streamlit.io/api/v2/apps/disambiguate?path=BlusteinLidor/doc_classifier/master/app/streamlit_app.py
+```
 
 Demo limits (cost / abuse): max **3** PDFs per run, **5 MB** each.
 

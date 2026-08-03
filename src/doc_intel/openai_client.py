@@ -10,6 +10,7 @@ from openai import (
     APIConnectionError,
     APIError,
     APITimeoutError,
+    AuthenticationError,
     OpenAI,
     RateLimitError,
 )
@@ -72,6 +73,11 @@ def parse_structured(
                 time.sleep(delay)
                 continue
             break
+        except AuthenticationError as exc:
+            logger.exception("OpenAI authentication error")
+            raise OpenAIClientError(
+                "Invalid OPENAI_API_KEY. Update .env or Streamlit secrets with a valid key."
+            ) from exc
         except APIError as exc:
             logger.exception("OpenAI API error")
             raise OpenAIClientError(
