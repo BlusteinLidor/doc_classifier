@@ -6,8 +6,13 @@ import {
   samplePdfUrl,
 } from "./api/client";
 import type { ProcessingResult, StreamEvent } from "./api/types";
+import { type IncomingIntervalMs } from "./components/DemoSettings";
 import { Footer } from "./components/Footer";
 import { Hero } from "./components/Hero";
+import {
+  IncomingBanner,
+  type IncomingSource,
+} from "./components/IncomingBanner";
 import {
   phaseFromStageMessage,
   ProcessTimeline,
@@ -17,9 +22,13 @@ import { ResultLayout } from "./components/ResultLayout";
 import { TopBar } from "./components/TopBar";
 import { UploadZone } from "./components/UploadZone";
 import type { Lang } from "./i18n/ui";
-import { t } from "./i18n/ui";
+import { DISPLAY_FILENAMES, t } from "./i18n/ui";
 
 const FEATURED_DEFAULT = "sample_invoice_he.pdf";
+const DEMO_SAMPLES = Object.keys(DISPLAY_FILENAMES);
+const INCOMING_BANNER_MS = 2200;
+const FIRST_INCOMING_DELAY_MS = 2500;
+const SOURCES: IncomingSource[] = ["desktop", "drive", "whatsapp"];
 
 export default function App() {
   const [lang, setLang] = useState<Lang>("he");
@@ -35,6 +44,36 @@ export default function App() {
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({});
   const blobUrlsRef = useRef<string[]>([]);
   const autoStarted = useRef(false);
+  const stageFileRef = useRef<string | undefined>();
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [intervalMs, setIntervalMs] = useState<IncomingIntervalMs>(0);
+  const [incoming, setIncoming] = useState<{
+    filename: string;
+    source: IncomingSource;
+  } | null>(null);
+
+  const sampleIndexRef = useRef(0);
+  const busyRef = useRef(false);
+  const processingRef = useRef(false);
+  const pendingIncomingRef = useRef(false);
+  const intervalMsRef = useRef<IncomingIntervalMs>(0);
+  const scheduleTimerRef = useRef<number | null>(null);
+  const bannerTimerRef = useRef<number | null>(null);
+  const hasQueuedFirstRef = useRef(false);
+  const runSampleRef = useRef<(name: string) => void>(() => undefined);
+
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+
+  useEffect(() => {
+    intervalMsRef.current = intervalMs;
+  }, [intervalMs]);
+
+  useEffect(() => {
+    stageFileRef.current = stageFile;
+  }, [stageFile]);
 
   useEffect(() => {
     document.documentElement.lang = lang === "he" ? "he" : "en";
@@ -64,6 +103,12 @@ export default function App() {
   useEffect(() => {
     return () => {
       for (const u of blobUrlsRef.current) URL.revokeObjectURL(u);
+      if (scheduleTimerRef.current != null) {
+        window.clearTimeout(scheduleTimerRef.current);
+      }
+      if (bannerTimerRef.current != null) {
+        window.clearTimeout(bannerTimerRef.current);
+      }
     };
   }, []);
 
@@ -87,11 +132,21 @@ export default function App() {
     }
   }, []);
 
+  const clearSchedule = useCallback(() => {
+    if (scheduleTimerRef.current != null) {
+      window.clearTimeout(scheduleTimerRef.current);
+      scheduleTimerRef.current = null;
+    }
+  }, []);
+
   const runProcess = useCallback(
     async (
       runner: (onEvent: (ev: StreamEvent) => void) => Promise<ProcessingResult[]>,
       urlMap?: Record<string, string>,
     ) => {
+      if (processingRef.current) return;
+      processingRef.current = true;
+      pendingIncomingRef.current = false;
       setBusy(true);
       setResults([]);
       setPhase("extract");
@@ -113,16 +168,17 @@ export default function App() {
         const message = err instanceof Error ? err.message : String(err);
         setResults([
           {
-            filename: stageFile || "error",
+            filename: stageFileRef.current || "error",
             success: false,
             error_message: message,
           },
         ]);
       } finally {
         setBusy(false);
+        processingRef.current = false;
       }
     },
-    [handleStreamEvent, stageFile],
+    [handleStreamEvent],
   );
 
   const runFeatured = useCallback(() => {
@@ -131,6 +187,19 @@ export default function App() {
       [name]: samplePdfUrl(name),
     });
   }, [featured, runProcess]);
+
+  const runSample = useCallback(
+    (name: string) => {
+      void runProcess((onEvent) => processSample(name, onEvent), {
+        [name]: samplePdfUrl(name),
+      });
+    },
+    [runProcess],
+  );
+
+  useEffect(() => {
+    runSampleRef.current = runSample;
+  }, [runSample]);
 
   const runUploads = useCallback(
     (files: File[]) => {
@@ -152,6 +221,90 @@ export default function App() {
     setStageMsg("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [clearBlobUrls]);
+
+  const triggerIncoming = useCallback(() => {
+    if (
+      busyRef.current ||
+      processingRef.current ||
+      pendingIncomingRef.current ||
+      intervalMsRef.current === 0
+    ) {
+      return;
+    }
+
+    pendingIncomingRef.current = true;
+    const list = DEMO_SAMPLES.length > 0 ? DEMO_SAMPLES : [FEATURED_DEFAULT];
+    const name = list[sampleIndexRef.current % list.length];
+    sampleIndexRef.current = (sampleIndexRef.current + 1) % list.length;
+    const source = SOURCES[Math.floor(Math.random() * SOURCES.length)];
+
+    setIncoming({ filename: name, source });
+    setSettingsOpen(false);
+
+    if (bannerTimerRef.current != null) {
+      window.clearTimeout(bannerTimerRef.current);
+    }
+    bannerTimerRef.current = window.setTimeout(() => {
+      bannerTimerRef.current = null;
+      setIncoming(null);
+      runSampleRef.current(name);
+    }, INCOMING_BANNER_MS);
+  }, []);
+
+  const scheduleNextIncoming = useCallback(
+    (delayMs: number) => {
+      clearSchedule();
+      if (intervalMsRef.current === 0) return;
+      scheduleTimerRef.current = window.setTimeout(() => {
+        scheduleTimerRef.current = null;
+        if (
+          busyRef.current ||
+          processingRef.current ||
+          pendingIncomingRef.current
+        ) {
+          scheduleNextIncoming(1500);
+          return;
+        }
+        triggerIncoming();
+      }, delayMs);
+    },
+    [clearSchedule, triggerIncoming],
+  );
+
+  // Enable / disable auto-incoming timer
+  useEffect(() => {
+    if (intervalMs === 0) {
+      clearSchedule();
+      hasQueuedFirstRef.current = false;
+      pendingIncomingRef.current = false;
+      if (bannerTimerRef.current != null) {
+        window.clearTimeout(bannerTimerRef.current);
+        bannerTimerRef.current = null;
+      }
+      setIncoming(null);
+      return;
+    }
+
+    if (!hasQueuedFirstRef.current) {
+      hasQueuedFirstRef.current = true;
+      scheduleNextIncoming(FIRST_INCOMING_DELAY_MS);
+    }
+
+    return () => {
+      // only clear on interval change / unmount handled by intervalMs===0 branch
+    };
+  }, [intervalMs, scheduleNextIncoming, clearSchedule]);
+
+  // After each finished run, queue the next arrival when demo mode is on
+  useEffect(() => {
+    if (intervalMs === 0) return;
+    if (busy) return;
+    if (pendingIncomingRef.current) return;
+    if (!hasQueuedFirstRef.current) return;
+    // Skip the initial "never processed" idle state — the enable effect schedules first arrival
+    if (results.length === 0 && sampleIndexRef.current === 0) return;
+    scheduleNextIncoming(intervalMs);
+  }, [busy, intervalMs, results, scheduleNextIncoming]);
 
   // ?demo=1 auto-starts featured document after 1s (for video capture)
   useEffect(() => {
@@ -180,10 +333,23 @@ export default function App() {
           busy={busy}
           onLangChange={setLang}
           onRunDemo={runFeatured}
-          showRun={!busy && results.length === 0}
+          showRun={!busy && results.length === 0 && intervalMs === 0}
+          settingsOpen={settingsOpen}
+          intervalMs={intervalMs}
+          onSettingsOpenChange={setSettingsOpen}
+          onIntervalChange={setIntervalMs}
         />
 
-        {results.length === 0 && !busy && (
+        {incoming && (
+          <IncomingBanner
+            lang={lang}
+            filename={incoming.filename}
+            source={incoming.source}
+            visible
+          />
+        )}
+
+        {results.length === 0 && !busy && !incoming && (
           <Hero
             lang={lang}
             busy={busy}
@@ -192,16 +358,16 @@ export default function App() {
           />
         )}
 
-        {busy && (
+        {(busy || incoming) && (
           <ProcessTimeline
             lang={lang}
-            phase={phase}
+            phase={incoming && !busy ? "extract" : phase}
             message={stageMsg}
-            filename={stageFile}
+            filename={incoming?.filename ?? stageFile}
           />
         )}
 
-        {results.length > 0 && !busy && (
+        {results.length > 0 && !busy && !incoming && (
           <ResultLayout
             lang={lang}
             results={results}
@@ -210,7 +376,7 @@ export default function App() {
           />
         )}
 
-        {!busy && (
+        {!busy && !incoming && (
           <>
             <UploadZone
               lang={lang}
