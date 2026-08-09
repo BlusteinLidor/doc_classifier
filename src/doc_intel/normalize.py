@@ -3,19 +3,21 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
-from doc_intel.models import (
-    ContractExtraction,
-    InvoiceExtraction,
-    ReceiptExtraction,
-    StructuredExtraction,
-)
+from pydantic import BaseModel
+
+from doc_intel.models import StructuredExtraction
 
 _ISO_DATE_RE = re.compile(r"\b(20\d{2}|19\d{2})-(\d{1,2})-(\d{1,2})\b")
 _DMY_SLASH_RE = re.compile(r"\b(\d{1,2})[./](\d{1,2})[./](20\d{2}|19\d{2})\b")
 
 # Longest number-like runs after stripping currency symbols.
 _amount_chunk_re = re.compile(r"[-+]?(?:\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)")
+
+# ISO date field endings map to display field by stripping _iso.
+_ISO_SUFFIX = "_iso"
+_VALUE_SUFFIX = "_value"
 
 
 def parse_amount_value(raw: str | None) -> float | None:
@@ -99,30 +101,27 @@ def _valid_ymd(year: int, month: int, day: int) -> bool:
     return 1900 <= year <= 2100
 
 
+def _fill_iso_and_amounts(data: dict[str, Any]) -> dict[str, Any]:
+    """For any field ending in _iso or _value, fill from sibling display field."""
+    keys = list(data.keys())
+    for key in keys:
+        if key.endswith(_ISO_SUFFIX) and not data.get(key):
+            source = key[: -len(_ISO_SUFFIX)]
+            if source in data:
+                data[key] = parse_date_iso(
+                    data[source] if isinstance(data[source], str) else None
+                )
+        elif key.endswith(_VALUE_SUFFIX) and data.get(key) is None:
+            source = key[: -len(_VALUE_SUFFIX)]
+            if source in data and data[source] is not None:
+                raw = data[source]
+                data[key] = parse_amount_value(str(raw) if raw is not None else None)
+    return data
+
+
 def normalize_structured(obj: StructuredExtraction) -> StructuredExtraction:
     """Fill numeric amount and ISO date fields when missing and parseable."""
-    if isinstance(obj, InvoiceExtraction):
-        data = obj.model_dump()
-        if data.get("total_amount_value") is None:
-            data["total_amount_value"] = parse_amount_value(data.get("total_amount"))
-        if not data.get("invoice_date_iso"):
-            data["invoice_date_iso"] = parse_date_iso(data.get("invoice_date"))
-        return InvoiceExtraction.model_validate(data)
-
-    if isinstance(obj, ContractExtraction):
-        data = obj.model_dump()
-        if not data.get("effective_date_iso"):
-            data["effective_date_iso"] = parse_date_iso(data.get("effective_date"))
-        if not data.get("end_date_iso"):
-            data["end_date_iso"] = parse_date_iso(data.get("end_date"))
-        return ContractExtraction.model_validate(data)
-
-    if isinstance(obj, ReceiptExtraction):
-        data = obj.model_dump()
-        if data.get("total_amount_value") is None:
-            data["total_amount_value"] = parse_amount_value(data.get("total_amount"))
-        if not data.get("receipt_date_iso"):
-            data["receipt_date_iso"] = parse_date_iso(data.get("receipt_date"))
-        return ReceiptExtraction.model_validate(data)
-
-    return obj
+    if not isinstance(obj, BaseModel):
+        return obj
+    data = _fill_iso_and_amounts(obj.model_dump())
+    return type(obj).model_validate(data)  # type: ignore[return-value]

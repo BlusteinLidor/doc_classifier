@@ -12,30 +12,17 @@ from openai import OpenAI
 
 from doc_intel.errors import ExtractionError, OpenAIClientError, PDFError
 from doc_intel.extractor import extract_pdf_text
-from doc_intel.models import (
-    ContractExtraction,
-    DocType,
-    DocumentKindResult,
-    InvoiceExtraction,
-    ProcessingResult,
-    ReceiptExtraction,
-    StructuredExtraction,
-)
+from doc_intel.models import DocType, DocumentKindResult, ProcessingResult
 from doc_intel.normalize import normalize_structured
 from doc_intel.ocr import vision_ocr_pdf
 from doc_intel.openai_client import DEFAULT_MODEL, create_client, parse_structured
-from doc_intel.prompts import (
-    SYSTEM_CLASSIFY,
-    SYSTEM_CONTRACT,
-    SYSTEM_INVOICE,
-    SYSTEM_RECEIPT,
-    build_classify_user_message,
-    build_extraction_user_message,
-)
+from doc_intel.prompts import SYSTEM_CLASSIFY, build_classify_user_message, build_extraction_user_message
+from doc_intel.registry import get_type_spec
 
 logger = logging.getLogger(__name__)
 
-CLASSIFY_EXCERPT_CHARS = 4_000
+CLASSIFY_HEAD_CHARS = 2_500
+CLASSIFY_TAIL_CHARS = 1_500
 ProgressCb = Callable[[str], None] | None
 
 
@@ -52,6 +39,15 @@ def _get_api_key() -> str:
 def _stage(on_stage: ProgressCb, message: str) -> None:
     if on_stage is not None:
         on_stage(message)
+
+
+def build_classify_excerpt(text: str) -> str:
+    """Head + tail sample so late titles still influence classification."""
+    if len(text) <= CLASSIFY_HEAD_CHARS + CLASSIFY_TAIL_CHARS:
+        return text
+    head = text[:CLASSIFY_HEAD_CHARS]
+    tail = text[-CLASSIFY_TAIL_CHARS:]
+    return f"{head}\n\n[...]\n\n{tail}"
 
 
 def process_pdf_bytes(
@@ -136,7 +132,7 @@ def process_pdf_bytes(
 
     # --- Classification ---
     _stage(on_stage, "Classifying document type…")
-    excerpt = text[:CLASSIFY_EXCERPT_CHARS]
+    excerpt = build_classify_excerpt(text)
     classify_user = build_classify_user_message(filename, excerpt)
 
     try:
@@ -168,23 +164,28 @@ def process_pdf_bytes(
             used_ocr=used_ocr,
         )
 
-    # --- Type-specific extraction ---
+    spec = get_type_spec(doc_type)
+    if spec is None:
+        # Should not happen with schema validation; treat as other-like failure path.
+        logger.warning("No registry entry for doc_type=%s; treating as failed extract", doc_type)
+        return _fail(
+            f"Unsupported document type: {doc_type}",
+            preview=preview,
+            doc_type=doc_type,
+            classification_note=classification_note,
+        )
+
+    # --- Type-specific (or generic/other) extraction ---
     _stage(on_stage, "Extracting structured fields…")
     extraction_user = build_extraction_user_message(filename, text)
-    schema_map: dict[str, tuple[type[StructuredExtraction], str]] = {
-        "invoice": (InvoiceExtraction, SYSTEM_INVOICE),
-        "contract": (ContractExtraction, SYSTEM_CONTRACT),
-        "receipt": (ReceiptExtraction, SYSTEM_RECEIPT),
-    }
-    response_model, system_prompt = schema_map[doc_type]
 
     try:
         structured = parse_structured(
             api_client,
             model=model,
-            system_prompt=system_prompt,
+            system_prompt=spec.system_prompt,
             user_message=extraction_user,
-            response_model=response_model,
+            response_model=spec.schema,
         )
         structured = normalize_structured(structured)
     except OpenAIClientError as exc:

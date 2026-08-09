@@ -236,6 +236,128 @@ def generate_receipt_en(out: Path) -> None:
     logger.info("Wrote %s", out)
 
 
+def generate_receipt_he(out: Path, fontfile: Path | None) -> None:
+    doc = fitz.open()
+    lines: list[tuple[str, float]] = [
+        ("קבלה", 18),
+        ("", 12),
+        ("בית עסק: קפה הנמל", 11),
+        ("מספר קבלה: RCP-HE-991", 11),
+        ("תאריך: 18/06/2025", 11),
+        ("", 11),
+        ("פריטים:", 12),
+        ("  קפה שחור          1 × ₪14  = ₪14", 10),
+        ("  עוגת גבינה        1 × ₪22  = ₪22", 10),
+        ("", 11),
+        ("לפני מע״מ: ₪36", 11),
+        ("מע״מ: ₪6.12", 11),
+        ("סה״כ: ₪42.12", 12),
+        ("מטבע: ILS", 11),
+        ("אמצעי תשלום: כרטיס ****8831", 11),
+        ("", 11),
+        ("(מסמך דוגמה לתיק עבודות — אינו מסמך אמיתי.)", 9),
+    ]
+    if fontfile is None:
+        logger.warning("No Unicode TTF; Hebrew receipt uses Latin fallback.")
+        lines = [
+            ("RECEIPT (Hebrew sample — font fallback)", 16),
+            ("", 12),
+            ("Merchant: Namal Cafe (HE)", 11),
+            ("Receipt number: RCP-HE-991", 11),
+            ("Date: 18/06/2025", 11),
+            ("Total amount: 42.12 ILS", 12),
+            ("Payment method: Card ****8831", 11),
+            ("(Synthetic portfolio sample — not a real receipt.)", 9),
+        ]
+        _write_page(doc, lines, None)
+    else:
+        _write_page(doc, lines, fontfile)
+    doc.save(out)
+    doc.close()
+    logger.info("Wrote %s", out)
+
+
+def generate_quote_en(out: Path) -> None:
+    doc = fitz.open()
+    lines: list[tuple[str, float]] = [
+        ("PRICE QUOTE / PROPOSAL", 18),
+        ("", 12),
+        ("Vendor: BrightOps Consulting LLC", 11),
+        ("Buyer: Harbor Bakery Inc.", 11),
+        ("Quote number: Q-2025-441", 11),
+        ("Quote date: 2025-04-02", 11),
+        ("Valid until: 2025-05-02", 11),
+        ("", 11),
+        ("Line items:", 12),
+        ("  Workflow automation setup   1 x 4500.00 = 4500.00", 10),
+        ("  Staff training workshop     2 x  800.00 = 1600.00", 10),
+        ("", 11),
+        ("Subtotal: 6100.00 USD", 11),
+        ("Total amount: 6100.00 USD", 12),
+        ("Currency: USD", 11),
+        ("", 11),
+        ("(Synthetic portfolio sample — not a real quote.)", 9),
+    ]
+    _write_page(doc, lines, None)
+    doc.save(out)
+    doc.close()
+    logger.info("Wrote %s", out)
+
+
+def generate_purchase_order_en(out: Path) -> None:
+    doc = fitz.open()
+    lines: list[tuple[str, float]] = [
+        ("PURCHASE ORDER", 18),
+        ("", 12),
+        ("Buyer: Acme Demo Co.", 11),
+        ("Vendor: Northwind Supplies Ltd.", 11),
+        ("PO number: PO-77801", 11),
+        ("PO date: 2025-05-10", 11),
+        ("Ship to: 120 Harbor Road, Suite 4", 11),
+        ("Requested delivery: 2025-05-25", 11),
+        ("", 11),
+        ("Line items:", 12),
+        ("  A4 paper cartons            20 x 12.00 = 240.00", 10),
+        ("  Toner cartridge black        4 x 48.00 = 192.00", 10),
+        ("", 11),
+        ("Total amount: 432.00 USD", 12),
+        ("Currency: USD", 11),
+        ("", 11),
+        ("(Synthetic portfolio sample — not a real purchase order.)", 9),
+    ]
+    _write_page(doc, lines, None)
+    doc.save(out)
+    doc.close()
+    logger.info("Wrote %s", out)
+
+
+def generate_bank_statement_en(out: Path) -> None:
+    doc = fitz.open()
+    lines: list[tuple[str, float]] = [
+        ("BANK STATEMENT", 18),
+        ("", 12),
+        ("Bank: Harbor National Bank", 11),
+        ("Account holder: Harbor Bakery Inc.", 11),
+        ("Account: ****4521", 11),
+        ("Period: 2025-03-01 to 2025-03-31", 11),
+        ("Currency: USD", 11),
+        ("", 11),
+        ("Opening balance: 12,450.00", 11),
+        ("Closing balance: 11,980.25", 11),
+        ("", 11),
+        ("Transactions:", 12),
+        ("  2025-03-03  POS Harbor Market          -84.20   12365.80", 10),
+        ("  2025-03-08  Wire from Acme             +900.00  13265.80", 10),
+        ("  2025-03-15  Payroll                   -1285.55 11980.25", 10),
+        ("", 11),
+        ("(Synthetic portfolio sample — not a real bank statement.)", 9),
+    ]
+    _write_page(doc, lines, None)
+    doc.save(out)
+    doc.close()
+    logger.info("Wrote %s", out)
+
+
 def main() -> None:
     _SAMPLES.mkdir(parents=True, exist_ok=True)
     font = _find_unicode_font()
@@ -246,6 +368,10 @@ def main() -> None:
     generate_contract_en(_SAMPLES / "sample_contract_en.pdf")
     generate_contract_he(_SAMPLES / "sample_contract_he.pdf", font)
     generate_receipt_en(_SAMPLES / "sample_receipt_en.pdf")
+    generate_receipt_he(_SAMPLES / "sample_receipt_he.pdf", font)
+    generate_quote_en(_SAMPLES / "sample_quote_en.pdf")
+    generate_purchase_order_en(_SAMPLES / "sample_purchase_order_en.pdf")
+    generate_bank_statement_en(_SAMPLES / "sample_bank_statement_en.pdf")
     logger.info("All samples written to %s", _SAMPLES)
 
 

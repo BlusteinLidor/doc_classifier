@@ -86,6 +86,42 @@ _SAMPLE_DOCS: list[tuple[str, str, str, str, str, bool, str]] = [
         False,
         "receipt",
     ),
+    (
+        "sample_receipt_he.pdf",
+        "Hebrew merchant · ₪ total",
+        "בית עסק בעברית · סה״כ ₪",
+        "Hebrew receipt",
+        "קבלה בעברית",
+        False,
+        "receipt",
+    ),
+    (
+        "sample_quote_en.pdf",
+        "Proposal · validity period",
+        "הצעת מחיר · תוקף",
+        "English quote",
+        "הצעת מחיר באנגלית",
+        False,
+        "quote",
+    ),
+    (
+        "sample_purchase_order_en.pdf",
+        "Buyer PO · line items",
+        "הזמנת רכש · פריטים",
+        "English purchase order",
+        "הזמנת רכש באנגלית",
+        False,
+        "purchase_order",
+    ),
+    (
+        "sample_bank_statement_en.pdf",
+        "Period · balances & transactions",
+        "תקופה · יתרות ותנועות",
+        "English bank statement",
+        "דף חשבון באנגלית",
+        False,
+        "bank_statement",
+    ),
 ]
 
 
@@ -336,11 +372,7 @@ async def process_upload_stream(
 
 def _coerce_results(raw: list[dict[str, Any]]) -> list[ProcessingResult]:
     """Rebuild ProcessingResult using doc_type to pick the structured schema."""
-    from doc_intel.models import (
-        ContractExtraction,
-        InvoiceExtraction,
-        ReceiptExtraction,
-    )
+    from doc_intel.registry import get_type_spec
 
     out: list[ProcessingResult] = []
     for item in raw:
@@ -348,12 +380,10 @@ def _coerce_results(raw: list[dict[str, Any]]) -> list[ProcessingResult]:
         st = payload.pop("structured", None)
         doc_type = payload.get("doc_type")
         base = ProcessingResult.model_validate({**payload, "structured": None})
-        if isinstance(st, dict) and doc_type == "invoice":
-            base.structured = InvoiceExtraction.model_validate(st)
-        elif isinstance(st, dict) and doc_type == "contract":
-            base.structured = ContractExtraction.model_validate(st)
-        elif isinstance(st, dict) and doc_type == "receipt":
-            base.structured = ReceiptExtraction.model_validate(st)
+        if isinstance(st, dict) and doc_type:
+            spec = get_type_spec(str(doc_type))
+            if spec is not None:
+                base.structured = spec.schema.model_validate(st)
         out.append(base)
     return out
 

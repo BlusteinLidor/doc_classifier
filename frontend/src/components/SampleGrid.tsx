@@ -1,4 +1,5 @@
 import type { SampleMeta } from "../api/types";
+import { typeFamily } from "../api/types";
 import type { Lang } from "../i18n/ui";
 import { t } from "../i18n/ui";
 
@@ -18,6 +19,7 @@ export function SampleGrid({ lang, samples, busy, onSelect }: Props) {
         {samples.map((s) => {
           const label = lang === "he" ? s.label_he : s.label_en;
           const teaser = lang === "he" ? s.teaser_he : s.teaser_en;
+          const family = typeFamily(s.kind);
           return (
             <button
               key={s.filename}
@@ -26,7 +28,7 @@ export function SampleGrid({ lang, samples, busy, onSelect }: Props) {
               disabled={busy}
               onClick={() => onSelect(s.filename)}
             >
-              <span className={`sample-kind ${s.kind}`}>{s.kind}</span>
+              <span className={`sample-kind ${s.kind} family-${family}`}>{s.kind}</span>
               <p className="sample-label">{label}</p>
               <p className="sample-teaser">{teaser}</p>
             </button>

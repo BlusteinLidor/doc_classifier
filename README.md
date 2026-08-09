@@ -1,7 +1,8 @@
 # AI Document Intelligence
 
-Classify invoice / contract / receipt PDFs (or unknown), extract structured fields
-(English / Hebrew), with vision OCR fallback for image-only scans.
+Classify invoice / contract / receipt / quote / PO / bank statement and more PDF types
+(or other / unknown), extract structured fields (English / Hebrew), with vision OCR
+fallback for image-only scans.
 
 **Stack:** React + FastAPI · OpenAI · PyMuPDF · Pydantic V2
 

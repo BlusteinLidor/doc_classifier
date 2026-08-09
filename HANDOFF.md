@@ -10,7 +10,7 @@ title_en: AI Document Intelligence
 title_he: בינה מלאכותית למסמכים
 problem_en: Small businesses bury invoices and contracts in shared drives — finding the right file or key fields takes minutes every time.
 problem_he: עסקים קטנים שומרים חשבוניות וחוזים בתיקיות משותפות — איתור המסמך הנכון או השדות החשובים גוזל דקות בכל פעם.
-solution_en: Upload a PDF (or try a one-click sample). The demo classifies invoice / contract / receipt (or unknown), extracts structured fields in Hebrew or English, and falls back to vision OCR for image-only PDFs.
+solution_en: Upload a PDF (or try a one-click sample). The demo classifies business document types (invoice, receipt, quote, PO, contract, bank statement, and more — or other/unknown), extracts structured fields in Hebrew or English, and falls back to vision OCR for image-only PDFs.
 solution_he: העלו PDF (או נסו דוגמה בלחיצה). ההדגמה מסווגת חשבונית / חוזה / קבלה (או לא ידוע), מחלצת שדות מובנים בעברית או באנגלית, ומשתמשת ב-OCR לסריקות ללא טקסט.
 result_en: Instant category plus human-readable fields — fewer misfiled docs and faster follow-up without manual retyping.
 result_he: סיווג מיידי ושדות קריאים — פחות מסמכים שמוגשים לא נכון ומענה מהיר יותר בלי להקליד מחדש.

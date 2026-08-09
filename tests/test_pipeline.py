@@ -19,10 +19,13 @@ from doc_intel.errors import ExtractionError  # noqa: E402
 from doc_intel.models import (  # noqa: E402
     ContractExtraction,
     DocumentKindResult,
+    GenericExtraction,
     InvoiceExtraction,
+    QuoteExtraction,
     ReceiptExtraction,
 )
-from doc_intel.pipeline import process_pdf_bytes  # noqa: E402
+from doc_intel.pipeline import build_classify_excerpt, process_pdf_bytes  # noqa: E402
+from doc_intel.registry import assert_registry_complete  # noqa: E402
 
 
 def _make_text_pdf(text: str) -> bytes:
@@ -42,12 +45,23 @@ def invoice_pdf() -> bytes:
     )
 
 
+def test_registry_complete() -> None:
+    assert_registry_complete()
+
+
+def test_build_classify_excerpt_head_and_tail() -> None:
+    text = "A" * 3000 + "MIDDLE" + "B" * 3000
+    excerpt = build_classify_excerpt(text)
+    assert excerpt.startswith("A")
+    assert excerpt.endswith("B")
+    assert "[...]" in excerpt
+    assert len(excerpt) < len(text)
+
+
 def test_process_invoice_surfaces_confidence_and_latency(
     invoice_pdf: bytes, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-
-    calls: list[str] = []
 
     def fake_parse(
         client: Any,
@@ -122,6 +136,75 @@ def test_process_unknown_skips_extraction(
     assert result.doc_type == "unknown"
     assert result.structured is None
     assert any("unknown" in w.lower() for w in result.warnings)
+
+
+def test_process_other_extracts_generic(
+    invoice_pdf: bytes, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    def fake_parse(
+        client: Any,
+        *,
+        model: str,
+        system_prompt: str,
+        user_message: str,
+        response_model: type,
+    ) -> Any:
+        if response_model is DocumentKindResult:
+            return DocumentKindResult(kind="other", confidence_note="Misc business doc")
+        if response_model is GenericExtraction:
+            return GenericExtraction(
+                title="Internal memo",
+                summary="Discusses vendor terms",
+                organizations=["Acme"],
+            )
+        raise AssertionError(f"Unexpected {response_model}")
+
+    with (
+        patch("doc_intel.pipeline.create_client", return_value=MagicMock()),
+        patch("doc_intel.pipeline.parse_structured", side_effect=fake_parse),
+    ):
+        result = process_pdf_bytes("memo.pdf", invoice_pdf, enable_ocr=False)
+
+    assert result.success
+    assert result.doc_type == "other"
+    assert isinstance(result.structured, GenericExtraction)
+    assert result.structured.title == "Internal memo"
+
+
+def test_process_quote(invoice_pdf: bytes, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    def fake_parse(
+        client: Any,
+        *,
+        model: str,
+        system_prompt: str,
+        user_message: str,
+        response_model: type,
+    ) -> Any:
+        if response_model is DocumentKindResult:
+            return DocumentKindResult(kind="quote")
+        if response_model is QuoteExtraction:
+            return QuoteExtraction(
+                vendor="BrightOps",
+                quote_number="Q-1",
+                total_amount="5000 USD",
+                quote_date="2025-04-02",
+            )
+        raise AssertionError(f"Unexpected {response_model}")
+
+    with (
+        patch("doc_intel.pipeline.create_client", return_value=MagicMock()),
+        patch("doc_intel.pipeline.parse_structured", side_effect=fake_parse),
+    ):
+        result = process_pdf_bytes("q.pdf", invoice_pdf, enable_ocr=False)
+
+    assert result.success and result.doc_type == "quote"
+    assert isinstance(result.structured, QuoteExtraction)
+    assert result.structured.total_amount_value == pytest.approx(5000.0)
+    assert result.structured.quote_date_iso == "2025-04-02"
 
 
 def test_process_receipt(invoice_pdf: bytes, monkeypatch: pytest.MonkeyPatch) -> None:

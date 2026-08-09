@@ -1,5 +1,6 @@
 import { downloadExport, downloadJsonLocal, samplePdfUrl } from "../api/client";
 import type { ProcessingResult } from "../api/types";
+import { typeFamily } from "../api/types";
 import type { Lang } from "../i18n/ui";
 import { t, typeLabel } from "../i18n/ui";
 import { FieldPanel, summaryLine } from "./FieldPanel";
@@ -109,6 +110,7 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
         }
         if (r.used_ocr) meta.push(t(lang, "used_ocr"));
         const dt = r.doc_type || "unknown";
+        const family = typeFamily(dt);
 
         return (
           <article key={r.filename} className="result-card">
@@ -152,7 +154,9 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
             ) : (
               <>
                 <p className="panel-label">{t(lang, "classification")}</p>
-                <div className={`doc-badge ${dt}`}>{typeLabel(lang, dt)}</div>
+                <div className={`doc-badge ${dt} family-${family}`}>
+                  {typeLabel(lang, dt)}
+                </div>
                 {r.classification_confidence_note && (
                   <div className="info-box">
                     {t(lang, "confidence")}: {r.classification_confidence_note}

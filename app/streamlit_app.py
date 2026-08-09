@@ -25,14 +25,9 @@ from doc_intel.export import (
     results_to_json_bytes,
     single_result_to_json_bytes,
 )
-from doc_intel.models import (
-    ContractExtraction,
-    InvoiceExtraction,
-    ProcessingResult,
-    ReceiptExtraction,
-    StructuredExtraction,
-)
+from doc_intel.models import ProcessingResult, StructuredExtraction
 from doc_intel.pipeline import process_pdf_bytes
+from doc_intel.registry import get_type_spec
 
 load_dotenv()
 
@@ -99,6 +94,38 @@ _SAMPLE_DOCS: list[tuple[str, str, str, str, str, bool]] = [
         "קבלה באנגלית",
         False,
     ),
+    (
+        "sample_receipt_he.pdf",
+        "Hebrew merchant · ₪ total",
+        "בית עסק בעברית · סה״כ ₪",
+        "Hebrew receipt",
+        "קבלה בעברית",
+        False,
+    ),
+    (
+        "sample_quote_en.pdf",
+        "Proposal · validity period",
+        "הצעת מחיר · תוקף",
+        "English quote",
+        "הצעת מחיר באנגלית",
+        False,
+    ),
+    (
+        "sample_purchase_order_en.pdf",
+        "Buyer PO · line items",
+        "הזמנת רכש · פריטים",
+        "English purchase order",
+        "הזמנת רכש באנגלית",
+        False,
+    ),
+    (
+        "sample_bank_statement_en.pdf",
+        "Period · balances & transactions",
+        "תקופה · יתרות ותנועות",
+        "English bank statement",
+        "דף חשבון באנגלית",
+        False,
+    ),
 ]
 
 _UI: dict[str, dict[str, str]] = {
@@ -107,7 +134,7 @@ _UI: dict[str, dict[str, str]] = {
         "brand": "AI Document Intelligence",
         "brand_he_sub": "בינה מלאכותית למסמכים",
         "value": "Upload a PDF. Get type + key fields in seconds.",
-        "chip_types": "Invoice · Contract · Receipt",
+        "chip_types": "Invoice · Quote · PO · Contract · Receipt · Bank · more",
         "chip_lang": "Hebrew / English",
         "chip_time": "Usually 15–45 sec",
         "how_title": "How it works",
@@ -159,6 +186,8 @@ _UI: dict[str, dict[str, str]] = {
         "parties": "Parties",
         "key_terms": "Key terms",
         "items": "Items",
+        "transactions": "Transactions",
+        "deductions": "Deductions",
         "col_file": "File",
         "col_type": "Type",
         "col_summary": "Summary",
@@ -172,7 +201,7 @@ _UI: dict[str, dict[str, str]] = {
         "brand": "בינה מלאכותית למסמכים",
         "brand_he_sub": "AI Document Intelligence",
         "value": "העלו PDF. קבלו סוג מסמך ושדות מפתח תוך שניות.",
-        "chip_types": "חשבונית · חוזה · קבלה",
+        "chip_types": "חשבונית · הצעה · הזמנה · חוזה · קבלה · ועוד",
         "chip_lang": "עברית / אנגלית",
         "chip_time": "בדרך כלל 15–45 שנ׳",
         "how_title": "איך זה עובד",
@@ -224,6 +253,8 @@ _UI: dict[str, dict[str, str]] = {
         "parties": "צדדים",
         "key_terms": "תנאים עיקריים",
         "items": "פריטים",
+        "transactions": "תנועות",
+        "deductions": "ניכויים",
         "col_file": "קובץ",
         "col_type": "סוג",
         "col_summary": "סיכום",
@@ -238,33 +269,135 @@ _UI: dict[str, dict[str, str]] = {
 _FIELD_LABELS: dict[str, tuple[str, str]] = {
     "vendor": ("Vendor", "ספק"),
     "buyer": ("Buyer", "לקוח"),
+    "merchant": ("Merchant", "בית עסק"),
+    "provider": ("Provider", "ספק שירות"),
+    "employer": ("Employer", "מעסיק"),
+    "employee": ("Employee", "עובד"),
+    "shipper": ("Shipper", "שולח"),
+    "recipient": ("Recipient", "נמען"),
+    "sender": ("Sender", "שולח"),
+    "customer_name": ("Customer", "לקוח"),
+    "account_holder": ("Account holder", "בעל חשבון"),
+    "bank_name": ("Bank", "בנק"),
+    "authority": ("Authority", "רשות"),
+    "taxpayer_name": ("Taxpayer", "נישום"),
     "invoice_number": ("Invoice #", "מס׳ חשבונית"),
+    "credit_note_number": ("Credit note #", "מס׳ זיכוי"),
+    "receipt_number": ("Receipt #", "מס׳ קבלה"),
+    "quote_number": ("Quote #", "מס׳ הצעה"),
+    "po_number": ("PO #", "מס׳ הזמנה"),
+    "delivery_note_number": ("Delivery note #", "מס׳ תעודת משלוח"),
+    "contract_number": ("Contract #", "מס׳ חוזה"),
+    "reference_number": ("Reference #", "אסמכתא"),
+    "account_number": ("Account #", "מס׳ חשבון"),
+    "account_mask": ("Account", "חשבון"),
     "invoice_date": ("Invoice date", "תאריך חשבונית"),
     "invoice_date_iso": ("Date (ISO)", "תאריך (ISO)"),
-    "total_amount": ("Total", "סה״כ"),
-    "total_amount_value": ("Total (numeric)", "סה״כ (מספר)"),
-    "currency": ("Currency", "מטבע"),
-    "tax_id": ("Tax ID", "ח.פ / ע.מ"),
-    "title": ("Title", "כותרת"),
+    "credit_date": ("Credit date", "תאריך זיכוי"),
+    "credit_date_iso": ("Credit (ISO)", "זיכוי (ISO)"),
+    "receipt_date": ("Receipt date", "תאריך קבלה"),
+    "receipt_date_iso": ("Date (ISO)", "תאריך (ISO)"),
+    "quote_date": ("Quote date", "תאריך הצעה"),
+    "quote_date_iso": ("Quote (ISO)", "הצעה (ISO)"),
+    "po_date": ("PO date", "תאריך הזמנה"),
+    "po_date_iso": ("PO (ISO)", "הזמנה (ISO)"),
+    "delivery_date": ("Delivery date", "תאריך משלוח"),
+    "delivery_date_iso": ("Delivery (ISO)", "משלוח (ISO)"),
     "effective_date": ("Effective date", "תאריך תחילה"),
     "effective_date_iso": ("Effective (ISO)", "תחילה (ISO)"),
     "end_date": ("End date", "תאריך סיום"),
     "end_date_iso": ("End (ISO)", "סיום (ISO)"),
-    "governing_law": ("Governing law", "דין חל"),
-    "key_terms_summary": ("Key terms", "תנאים עיקריים"),
-    "merchant": ("Merchant", "בית עסק"),
-    "receipt_number": ("Receipt #", "מס׳ קבלה"),
-    "receipt_date": ("Receipt date", "תאריך קבלה"),
-    "receipt_date_iso": ("Date (ISO)", "תאריך (ISO)"),
+    "due_date": ("Due date", "תאריך לתשלום"),
+    "due_date_iso": ("Due (ISO)", "לתשלום (ISO)"),
+    "bill_date": ("Bill date", "תאריך חשבון"),
+    "bill_date_iso": ("Bill (ISO)", "חשבון (ISO)"),
+    "letter_date": ("Letter date", "תאריך מכתב"),
+    "letter_date_iso": ("Letter (ISO)", "מכתב (ISO)"),
+    "pay_date": ("Pay date", "תאריך תשלום"),
+    "pay_date_iso": ("Pay (ISO)", "תשלום (ISO)"),
+    "document_date": ("Document date", "תאריך מסמך"),
+    "document_date_iso": ("Document (ISO)", "מסמך (ISO)"),
+    "valid_until": ("Valid until", "בתוקף עד"),
+    "valid_until_iso": ("Valid until (ISO)", "תוקף (ISO)"),
+    "period_start": ("Period start", "תחילת תקופה"),
+    "period_start_iso": ("Period start (ISO)", "תחילה (ISO)"),
+    "period_end": ("Period end", "סוף תקופה"),
+    "period_end_iso": ("Period end (ISO)", "סיום (ISO)"),
+    "period": ("Period", "תקופה"),
+    "service_period": ("Service period", "תקופת שירות"),
+    "tax_period": ("Tax period", "תקופת מס"),
+    "total_amount": ("Total", "סה״כ"),
+    "total_amount_value": ("Total (numeric)", "סה״כ (מספר)"),
+    "subtotal": ("Subtotal", "לפני מע״מ"),
+    "tax_amount": ("Tax", "מס / מע״מ"),
+    "tax_rate": ("Tax rate", "שיעור מס"),
+    "amount_due": ("Amount due", "סכום לתשלום"),
+    "amount_due_value": ("Amount due (numeric)", "לתשלום (מספר)"),
+    "amount": ("Amount", "סכום"),
+    "amount_value": ("Amount (numeric)", "סכום (מספר)"),
+    "gross_pay": ("Gross pay", "ברוטו"),
+    "net_pay": ("Net pay", "נטו"),
+    "net_pay_value": ("Net (numeric)", "נטו (מספר)"),
+    "opening_balance": ("Opening balance", "יתרת פתיחה"),
+    "closing_balance": ("Closing balance", "יתרת סגירה"),
+    "currency": ("Currency", "מטבע"),
+    "tax_id": ("Tax ID", "ח.פ / ע.מ"),
     "payment_method": ("Payment", "אמצעי תשלום"),
+    "payment_terms": ("Payment terms", "תנאי תשלום"),
+    "po_reference": ("PO reference", "אסמכתת הזמנה"),
+    "original_invoice_ref": ("Original invoice", "חשבונית מקור"),
+    "order_reference": ("Order ref", "אסמכתת הזמנה"),
+    "ship_to": ("Ship to", "כתובת משלוח"),
+    "service_address": ("Service address", "כתובת שירות"),
+    "store_address": ("Store address", "כתובת חנות"),
+    "bank_details": ("Bank details", "פרטי בנק"),
+    "card_last4": ("Card last4", "4 ספרות אחרונות"),
+    "meter_reading": ("Meter", "מד"),
+    "governing_law": ("Governing law", "דין חל"),
+    "duration_or_term": ("Duration", "משך"),
+    "auto_renewal": ("Auto renewal", "חידוש אוטומטי"),
+    "key_terms_summary": ("Key terms", "תנאים עיקריים"),
+    "title": ("Title", "כותרת"),
+    "subject": ("Subject", "נושא"),
+    "document_title": ("Document title", "כותרת מסמך"),
+    "summary": ("Summary", "סיכום"),
+    "reason": ("Reason", "סיבה"),
+    "language_hint": ("Language", "שפה"),
     "confidence_notes": ("Notes", "הערות"),
 }
 
 _TYPE_LABELS: dict[str, tuple[str, str]] = {
     "invoice": ("Invoice", "חשבונית"),
-    "contract": ("Contract", "חוזה"),
+    "credit_note": ("Credit note", "זיכוי"),
     "receipt": ("Receipt", "קבלה"),
+    "quote": ("Quote", "הצעת מחיר"),
+    "purchase_order": ("Purchase order", "הזמנת רכש"),
+    "delivery_note": ("Delivery note", "תעודת משלוח"),
+    "contract": ("Contract", "חוזה"),
+    "bank_statement": ("Bank statement", "דף חשבון"),
+    "payslip": ("Payslip", "תלוש שכר"),
+    "utility_bill": ("Utility bill", "חשבון שירות"),
+    "tax_document": ("Tax document", "מסמך מס"),
+    "correspondence": ("Correspondence", "מכתב"),
+    "other": ("Other", "אחר"),
     "unknown": ("Unknown", "לא ידוע"),
+}
+
+_FAMILY_BY_TYPE: dict[str, str] = {
+    "invoice": "money",
+    "credit_note": "money",
+    "receipt": "money",
+    "quote": "money",
+    "bank_statement": "money",
+    "utility_bill": "money",
+    "purchase_order": "logistics",
+    "delivery_note": "logistics",
+    "contract": "agreement",
+    "payslip": "hr",
+    "tax_document": "tax",
+    "correspondence": "other",
+    "other": "other",
+    "unknown": "unknown",
 }
 
 st.set_page_config(
@@ -352,10 +485,15 @@ html, body, [data-testid="stAppViewContainer"] {
   letter-spacing: 0.02em; padding: 0.4rem 0.9rem; border-radius: 8px;
   margin: 0.25rem 0 0.55rem 0;
 }
-.doc-badge-invoice { background: #dbeafe; color: #1e3a8a; }
-.doc-badge-contract { background: #dcfce7; color: #14532d; }
-.doc-badge-receipt { background: #fef3c7; color: #92400e; }
-.doc-badge-unknown { background: #f3f4f6; color: #374151; }
+.doc-badge-invoice, .doc-badge-credit_note, .doc-badge-receipt,
+.doc-badge-quote, .doc-badge-bank_statement, .doc-badge-utility_bill,
+.doc-badge-money { background: #dbeafe; color: #1e3a8a; }
+.doc-badge-purchase_order, .doc-badge-delivery_note,
+.doc-badge-logistics { background: #d1fae5; color: #065f46; }
+.doc-badge-contract, .doc-badge-agreement { background: #dcfce7; color: #14532d; }
+.doc-badge-payslip, .doc-badge-hr { background: #f3e8ff; color: #6b21a8; }
+.doc-badge-tax_document, .doc-badge-tax { background: #fef3c7; color: #92400e; }
+.doc-badge-correspondence, .doc-badge-other, .doc-badge-unknown { background: #f3f4f6; color: #374151; }
 .di-party-chip {
   display: inline-block; background: #eef6f5; border: 1px solid #c5ddd9;
   border-radius: 8px; padding: 0.25rem 0.55rem; margin: 0.15rem 0.2rem 0.15rem 0;
@@ -425,15 +563,12 @@ def _render_pdf_preview(data: bytes, filename: str) -> None:
 
 def _doc_type_badge_html(doc_type: str | None) -> str:
     dt = doc_type or "unknown"
-    css_map = {
-        "invoice": "doc-badge-invoice",
-        "contract": "doc-badge-contract",
-        "receipt": "doc-badge-receipt",
-        "unknown": "doc-badge-unknown",
-    }
-    css = css_map.get(dt, "doc-badge-unknown")
+    family = _FAMILY_BY_TYPE.get(dt, "other")
     label = _type_label(dt)
-    return f'<div class="doc-badge {css}">{html.escape(label)}</div>'
+    return (
+        f'<div class="doc-badge doc-badge-{html.escape(dt)} doc-badge-{html.escape(family)}">'
+        f"{html.escape(label)}</div>"
+    )
 
 
 def _value_in_preview(value: str | None, preview: str) -> bool:
@@ -473,159 +608,153 @@ def _render_structured_cards(
 ) -> None:
     preview = result.raw_text_preview or ""
     dir_cls = " di-rtl" if _is_he() else ""
+    data = obj.model_dump()
+    doc_type = result.doc_type or "other"
+    spec = get_type_spec(doc_type)
 
-    if isinstance(obj, InvoiceExtraction):
-        amount = obj.total_amount or ""
-        cur = obj.currency or ""
-        hero = f"{amount} {cur}".strip()
-        if hero:
-            st.markdown(
-                f'<div class="di-hero-amount{dir_cls}">{html.escape(hero)}</div>',
-                unsafe_allow_html=True,
-            )
-        html_block = _field_rows_html(
-            [
-                ("vendor", obj.vendor),
-                ("invoice_number", obj.invoice_number),
-                ("invoice_date", obj.invoice_date),
-                ("invoice_date_iso", obj.invoice_date_iso),
-                ("total_amount", obj.total_amount),
-                (
-                    "total_amount_value",
-                    None
-                    if obj.total_amount_value is None
-                    else str(obj.total_amount_value),
-                ),
-                ("currency", obj.currency),
-                ("tax_id", obj.tax_id),
-                ("buyer", obj.buyer),
-            ],
-            preview=preview,
-        )
-        if html_block:
-            st.markdown(html_block, unsafe_allow_html=True)
-        _render_copy_row(
-            [
-                ("vendor", obj.vendor),
-                ("invoice_number", obj.invoice_number),
-                ("total_amount", obj.total_amount),
-            ],
-            key_prefix=f"cp_{result.filename}_inv",
-        )
-        if obj.line_items:
-            st.markdown(f"**{_t('line_items')}**")
-            table = [
-                {
-                    "description": li.description or "",
-                    "quantity": li.quantity or "",
-                    "unit_price": li.unit_price or "",
-                    "line_total": li.line_total or "",
-                }
-                for li in obj.line_items
-            ]
-            st.dataframe(table, use_container_width=True, hide_index=True)
-        if obj.confidence_notes:
-            st.info(f"{_t('extraction_notes')}: {obj.confidence_notes}")
+    list_keys = set(spec.list_fields.keys()) if spec else set()
+    skip = {"confidence_notes"}
+    primary = list(spec.primary_fields) if spec else []
+    highlight = list(spec.highlight_fields) if spec else []
 
-    elif isinstance(obj, ContractExtraction):
-        if obj.title:
-            st.markdown(
-                f'<div class="di-hero-title{dir_cls}">{html.escape(obj.title)}</div>',
-                unsafe_allow_html=True,
-            )
-        if obj.parties:
-            st.markdown(f"**{_t('parties')}**")
+    hero_parts = [
+        str(data[k])
+        for k in highlight
+        if data.get(k) is not None and str(data[k]).strip() != ""
+    ]
+    hero = " ".join(hero_parts).strip()
+    if hero:
+        is_title = bool(highlight and highlight[0] in ("title", "subject"))
+        cls = "di-hero-title" if is_title else "di-hero-amount"
+        st.markdown(
+            f'<div class="{cls}{dir_cls}">{html.escape(hero)}</div>',
+            unsafe_allow_html=True,
+        )
+
+    ordered: list[str] = []
+    for k in primary:
+        if k in list_keys or k in skip:
+            continue
+        val = data.get(k)
+        if val is None or (isinstance(val, str) and not val.strip()):
+            continue
+        if isinstance(val, (list, dict)):
+            continue
+        ordered.append(k)
+    for k, val in data.items():
+        if k in ordered or k in list_keys or k in skip:
+            continue
+        if val is None or isinstance(val, (list, dict)):
+            continue
+        if isinstance(val, str) and not val.strip():
+            continue
+        ordered.append(k)
+
+    pairs: list[tuple[str, str | None]] = [
+        (k, None if data[k] is None else str(data[k])) for k in ordered
+    ]
+    html_block = _field_rows_html(pairs, preview=preview)
+    if html_block:
+        st.markdown(html_block, unsafe_allow_html=True)
+
+    copy_candidates = [
+        (k, None if data.get(k) is None else str(data.get(k)))
+        for k in (highlight + primary)[:5]
+        if k not in list_keys and data.get(k) is not None
+    ]
+    _render_copy_row(copy_candidates, key_prefix=f"cp_{result.filename}_{doc_type}")
+
+    list_fields: dict[str, str] = dict(spec.list_fields) if spec else {}
+    if not list_fields:
+        # Fallback: detect list fields on the model dump.
+        for k, val in data.items():
+            if isinstance(val, list) and val:
+                list_fields[k] = "line_items"
+
+    for key, kind in list_fields.items():
+        raw = data.get(key) or []
+        if not isinstance(raw, list) or not raw:
+            continue
+        label = {
+            "line_items": "line_items",
+            "items": "items",
+            "parties": "parties",
+            "transactions": "transactions",
+            "deductions": "deductions",
+        }.get(key, key)
+        st.markdown(f"**{_t(label) if label in _UI['en'] else _field_label(key)}**")
+
+        if kind == "parties":
             chips = []
-            for p in obj.parties:
-                name = p.name or "—"
-                role = f" ({p.role})" if p.role else ""
+            for p in raw:
+                if not isinstance(p, dict):
+                    continue
+                name = p.get("name") or "—"
+                role = f" ({p['role']})" if p.get("role") else ""
                 chips.append(
-                    f'<span class="di-party-chip">{html.escape(name + role)}</span>'
+                    f'<span class="di-party-chip">{html.escape(str(name) + role)}</span>'
                 )
-            st.markdown(
-                f'<div class="{dir_cls.strip()}">' + "".join(chips) + "</div>",
-                unsafe_allow_html=True,
-            )
-        html_block = _field_rows_html(
-            [
-                ("effective_date", obj.effective_date),
-                ("effective_date_iso", obj.effective_date_iso),
-                ("end_date", obj.end_date),
-                ("end_date_iso", obj.end_date_iso),
-                ("governing_law", obj.governing_law),
-            ],
-            preview=preview,
-        )
-        if html_block:
-            st.markdown(html_block, unsafe_allow_html=True)
-        if obj.key_terms_summary:
-            st.markdown(f"**{_t('key_terms')}**")
-            st.markdown(
-                f'<div class="di-field-card{dir_cls}">'
-                f"{html.escape(obj.key_terms_summary)}</div>",
-                unsafe_allow_html=True,
-            )
-        _render_copy_row(
-            [
-                ("title", obj.title),
-                ("governing_law", obj.governing_law),
-            ],
-            key_prefix=f"cp_{result.filename}_ctr",
-        )
-        if obj.confidence_notes:
-            st.info(f"{_t('extraction_notes')}: {obj.confidence_notes}")
-
-    elif isinstance(obj, ReceiptExtraction):
-        amount = obj.total_amount or ""
-        cur = obj.currency or ""
-        hero = f"{amount} {cur}".strip()
-        if hero:
-            st.markdown(
-                f'<div class="di-hero-amount{dir_cls}">{html.escape(hero)}</div>',
-                unsafe_allow_html=True,
-            )
-        html_block = _field_rows_html(
-            [
-                ("merchant", obj.merchant),
-                ("receipt_number", obj.receipt_number),
-                ("receipt_date", obj.receipt_date),
-                ("receipt_date_iso", obj.receipt_date_iso),
-                ("total_amount", obj.total_amount),
-                (
-                    "total_amount_value",
-                    None
-                    if obj.total_amount_value is None
-                    else str(obj.total_amount_value),
-                ),
-                ("currency", obj.currency),
-                ("payment_method", obj.payment_method),
-            ],
-            preview=preview,
-        )
-        if html_block:
-            st.markdown(html_block, unsafe_allow_html=True)
-        _render_copy_row(
-            [
-                ("merchant", obj.merchant),
-                ("receipt_number", obj.receipt_number),
-                ("total_amount", obj.total_amount),
-            ],
-            key_prefix=f"cp_{result.filename}_rcp",
-        )
-        if obj.items:
-            st.markdown(f"**{_t('items')}**")
+            if chips:
+                st.markdown(
+                    f'<div class="{dir_cls.strip()}">' + "".join(chips) + "</div>",
+                    unsafe_allow_html=True,
+                )
+        elif kind == "strings":
+            chips = [
+                f'<span class="di-party-chip">{html.escape(str(v))}</span>'
+                for v in raw
+                if v
+            ]
+            if chips:
+                st.markdown(
+                    f'<div class="{dir_cls.strip()}">' + "".join(chips) + "</div>",
+                    unsafe_allow_html=True,
+                )
+        elif kind == "transactions":
             table = [
                 {
-                    "description": li.description or "",
-                    "quantity": li.quantity or "",
-                    "unit_price": li.unit_price or "",
-                    "line_total": li.line_total or "",
+                    "date": (row.get("date") or "") if isinstance(row, dict) else "",
+                    "description": (row.get("description") or "")
+                    if isinstance(row, dict)
+                    else "",
+                    "amount": (row.get("amount") or "") if isinstance(row, dict) else "",
+                    "balance": (row.get("balance") or "") if isinstance(row, dict) else "",
                 }
-                for li in obj.items
+                for row in raw
             ]
             st.dataframe(table, use_container_width=True, hide_index=True)
-        if obj.confidence_notes:
-            st.info(f"{_t('extraction_notes')}: {obj.confidence_notes}")
+        elif kind == "named_amounts":
+            table = [
+                {
+                    "name": (row.get("name") or "") if isinstance(row, dict) else "",
+                    "amount": (row.get("amount") or "") if isinstance(row, dict) else "",
+                }
+                for row in raw
+            ]
+            st.dataframe(table, use_container_width=True, hide_index=True)
+        else:
+            table = [
+                {
+                    "description": (row.get("description") or "")
+                    if isinstance(row, dict)
+                    else "",
+                    "quantity": (row.get("quantity") or "")
+                    if isinstance(row, dict)
+                    else "",
+                    "unit_price": (row.get("unit_price") or "")
+                    if isinstance(row, dict)
+                    else "",
+                    "line_total": (row.get("line_total") or "")
+                    if isinstance(row, dict)
+                    else "",
+                }
+                for row in raw
+            ]
+            st.dataframe(table, use_container_width=True, hide_index=True)
+
+    notes = data.get("confidence_notes")
+    if notes:
+        st.info(f"{_t('extraction_notes')}: {notes}")
 
 
 def _render_copy_row(
@@ -647,20 +776,32 @@ def _batch_summary_row(r: ProcessingResult) -> dict[str, str]:
     if not r.success:
         summary = r.error_message or _t("failed")
         status = _t("failed")
-    elif r.doc_type == "unknown":
+    elif r.doc_type == "unknown" and r.structured is None:
         summary = _t("unknown_ok")
         status = _t("ok")
-    elif isinstance(r.structured, InvoiceExtraction):
-        parts = [p for p in [r.structured.vendor, r.structured.total_amount] if p]
-        summary = " · ".join(parts) if parts else "—"
-        status = _t("ok")
-    elif isinstance(r.structured, ContractExtraction):
-        title = r.structured.title or "—"
-        n = len(r.structured.parties)
-        summary = f"{title} ({n} parties)" if n else title
-        status = _t("ok")
-    elif isinstance(r.structured, ReceiptExtraction):
-        parts = [p for p in [r.structured.merchant, r.structured.total_amount] if p]
+    elif r.structured is not None:
+        data = r.structured.model_dump()
+        spec = get_type_spec(r.doc_type or "other")
+        keys: list[str] = []
+        if spec:
+            keys.extend(spec.highlight_fields)
+            keys.extend(spec.primary_fields[:3])
+        parts: list[str] = []
+        seen: set[str] = set()
+        for k in keys:
+            v = data.get(k)
+            if v is None or isinstance(v, (list, dict)):
+                continue
+            s = str(v).strip()
+            if s and s not in seen:
+                seen.add(s)
+                parts.append(s)
+            if len(parts) >= 3:
+                break
+        if not parts and data.get("summary"):
+            parts.append(str(data["summary"]))
+        if not parts and data.get("title"):
+            parts.append(str(data["title"]))
         summary = " · ".join(parts) if parts else "—"
         status = _t("ok")
     else:
@@ -672,6 +813,8 @@ def _batch_summary_row(r: ProcessingResult) -> dict[str, str]:
         _t("col_summary"): summary,
         _t("col_status"): status,
     }
+
+
 
 
 def _process_file_list(files: list[tuple[str, bytes]]) -> None:

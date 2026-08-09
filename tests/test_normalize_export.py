@@ -21,9 +21,12 @@ from doc_intel.export import (  # noqa: E402
 )
 from doc_intel.models import (  # noqa: E402
     ContractExtraction,
+    DocumentKindResult,
     InvoiceExtraction,
     ProcessingResult,
+    QuoteExtraction,
     ReceiptExtraction,
+    UtilityBillExtraction,
 )
 from doc_intel.normalize import (  # noqa: E402
     normalize_structured,
@@ -71,11 +74,13 @@ def test_normalize_invoice_fills_numeric_and_iso() -> None:
         vendor="Acme",
         total_amount="1,250.50 USD",
         invoice_date="15/03/2025",
+        due_date="30/03/2025",
     )
     out = normalize_structured(inv)
     assert isinstance(out, InvoiceExtraction)
     assert out.total_amount_value == pytest.approx(1250.50)
     assert out.invoice_date_iso == "2025-03-15"
+    assert out.due_date_iso == "2025-03-30"
 
 
 def test_normalize_contract_dates() -> None:
@@ -98,6 +103,22 @@ def test_normalize_receipt() -> None:
     assert out.receipt_date_iso == "2025-06-18"
 
 
+def test_normalize_quote_and_utility() -> None:
+    q = normalize_structured(
+        QuoteExtraction(total_amount="6,100.00", quote_date="02/04/2025")
+    )
+    assert isinstance(q, QuoteExtraction)
+    assert q.total_amount_value == pytest.approx(6100.0)
+    assert q.quote_date_iso == "2025-04-02"
+
+    bill = normalize_structured(
+        UtilityBillExtraction(amount_due="320.50 ILS", due_date="15.05.2025")
+    )
+    assert isinstance(bill, UtilityBillExtraction)
+    assert bill.amount_due_value == pytest.approx(320.50)
+    assert bill.due_date_iso == "2025-05-15"
+
+
 def test_export_json_and_csv_include_confidence() -> None:
     results = [
         ProcessingResult(
@@ -110,6 +131,7 @@ def test_export_json_and_csv_include_confidence() -> None:
                 total_amount="100",
                 total_amount_value=100.0,
                 currency="USD",
+                po_reference="PO-1",
             ),
             latency_ms=1234,
             used_ocr=False,
@@ -134,12 +156,14 @@ def test_export_json_and_csv_include_confidence() -> None:
     csv_text = results_to_csv_bytes(results).decode("utf-8-sig")
     assert "classification_confidence_note" in csv_text
     assert "extracted_vendor" in csv_text
+    assert "extracted_po_reference" in csv_text
     assert "Northwind" in csv_text
     assert branded_export_basename().startswith("extraction_")
 
 
-def test_document_kind_accepts_receipt_and_unknown() -> None:
-    from doc_intel.models import DocumentKindResult
-
+def test_document_kind_accepts_new_types() -> None:
     assert DocumentKindResult(kind="receipt").kind == "receipt"
     assert DocumentKindResult(kind="unknown").kind == "unknown"
+    assert DocumentKindResult(kind="quote").kind == "quote"
+    assert DocumentKindResult(kind="bank_statement").kind == "bank_statement"
+    assert DocumentKindResult(kind="other").kind == "other"

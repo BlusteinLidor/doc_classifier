@@ -81,7 +81,9 @@ Demo limits (cost / abuse): max **3** PDFs per run, **5 MB** each; OCR limited t
 ## Notes
 
 - Prefer text PDFs; image-only PDFs fall back to **vision OCR** (OpenAI).
-- Types: invoice · contract · receipt · unknown.
+- Types: invoice · credit_note · receipt · quote · purchase_order · delivery_note ·
+  contract · bank_statement · payslip · utility_bill · tax_document · correspondence ·
+  other · unknown.
 - Model: `gpt-4o-mini` (see `src/doc_intel/openai_client.py`).
 
 ## Recording a short video

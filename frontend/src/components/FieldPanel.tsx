@@ -1,17 +1,58 @@
-import type { LineItem, ProcessingResult, StructuredExtraction } from "../api/types";
+import type {
+  ContractParty,
+  LineItem,
+  NamedAmount,
+  ProcessingResult,
+  StatementLine,
+  StructuredExtraction,
+  TypeUiSpec,
+} from "../api/types";
+import { TYPE_UI_SPECS } from "../api/types";
 import type { Lang } from "../i18n/ui";
 import { fieldLabel, t, typeLabel } from "../i18n/ui";
 
-function isInvoice(s: StructuredExtraction): s is import("../api/types").InvoiceExtraction {
-  return "invoice_number" in s || "vendor" in s || "line_items" in s;
+const SKIP_KEYS = new Set(["confidence_notes"]);
+
+function asRecord(s: StructuredExtraction): Record<string, unknown> {
+  return s as Record<string, unknown>;
 }
 
-function isContract(s: StructuredExtraction): s is import("../api/types").ContractExtraction {
-  return "parties" in s || "governing_law" in s || "title" in s;
+function isEmpty(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  if (typeof v === "string" && v.trim() === "") return true;
+  if (Array.isArray(v) && v.length === 0) return true;
+  return false;
 }
 
-function isReceipt(s: StructuredExtraction): s is import("../api/types").ReceiptExtraction {
-  return "merchant" in s || "receipt_number" in s || "payment_method" in s;
+function scalarString(v: unknown): string | number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === "string" || typeof v === "number") return v;
+  if (typeof v === "boolean") return String(v);
+  return null;
+}
+
+function defaultSpec(s: Record<string, unknown>): TypeUiSpec {
+  const primary = Object.keys(s).filter(
+    (k) => !SKIP_KEYS.has(k) && !Array.isArray(s[k]),
+  );
+  const listFields: TypeUiSpec["listFields"] = {};
+  for (const [k, v] of Object.entries(s)) {
+    if (!Array.isArray(v) || !v.length) continue;
+    if (typeof v[0] === "string") listFields[k] = "strings";
+    else if (v[0] && typeof v[0] === "object" && "role" in (v[0] as object))
+      listFields[k] = "parties";
+    else if (v[0] && typeof v[0] === "object" && "balance" in (v[0] as object))
+      listFields[k] = "transactions";
+    else if (v[0] && typeof v[0] === "object" && "name" in (v[0] as object))
+      listFields[k] = "named_amounts";
+    else listFields[k] = "line_items";
+  }
+  return {
+    family: "other",
+    highlightFields: primary.slice(0, 2),
+    primaryFields: primary,
+    listFields,
+  };
 }
 
 function FieldRows({
@@ -71,6 +112,88 @@ function LineItemsTable({
   );
 }
 
+function TransactionsTable({
+  lang,
+  rows,
+}: {
+  lang: Lang;
+  rows: StatementLine[];
+}) {
+  if (!rows.length) return null;
+  return (
+    <table className="data-table">
+      <thead>
+        <tr>
+          <th>{t(lang, "date")}</th>
+          <th>{t(lang, "desc")}</th>
+          <th>{t(lang, "amount")}</th>
+          <th>{t(lang, "balance")}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr key={i}>
+            <td>{row.date ?? ""}</td>
+            <td>{row.description ?? ""}</td>
+            <td>{row.amount ?? ""}</td>
+            <td>{row.balance ?? ""}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function NamedAmountsTable({
+  lang,
+  rows,
+}: {
+  lang: Lang;
+  rows: NamedAmount[];
+}) {
+  if (!rows.length) return null;
+  return (
+    <table className="data-table">
+      <thead>
+        <tr>
+          <th>{t(lang, "name")}</th>
+          <th>{t(lang, "amount")}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, i) => (
+          <tr key={i}>
+            <td>{row.name ?? ""}</td>
+            <td>{row.amount ?? ""}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function StringChips({ values }: { values: string[] }) {
+  if (!values.length) return null;
+  return (
+    <div className="party-chips">
+      {values.map((v, i) => (
+        <span key={i} className="party-chip">
+          {v}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function heroText(spec: TypeUiSpec, data: Record<string, unknown>): string {
+  const parts = spec.highlightFields
+    .map((k) => data[k])
+    .filter((v) => typeof v === "string" || typeof v === "number")
+    .map(String)
+    .filter((s) => s.trim() !== "");
+  return parts.join(" ").trim();
+}
+
 export function FieldPanel({
   lang,
   result,
@@ -86,145 +209,122 @@ export function FieldPanel({
     return <div className="info-box">{t(lang, "no_fields")}</div>;
   }
 
-  if (result.doc_type === "invoice" || isInvoice(s)) {
-    const inv = s as import("../api/types").InvoiceExtraction;
-    const hero = [inv.total_amount, inv.currency].filter(Boolean).join(" ");
-    return (
-      <>
-        {hero && <div className="hero-amount">{hero}</div>}
-        <FieldRows
-          lang={lang}
-          pairs={[
-            ["vendor", inv.vendor],
-            ["invoice_number", inv.invoice_number],
-            ["invoice_date", inv.invoice_date],
-            ["invoice_date_iso", inv.invoice_date_iso],
-            ["total_amount", inv.total_amount],
-            ["total_amount_value", inv.total_amount_value],
-            ["currency", inv.currency],
-            ["tax_id", inv.tax_id],
-            ["buyer", inv.buyer],
-          ]}
-        />
-        {inv.line_items && inv.line_items.length > 0 && (
-          <>
-            <p className="panel-label">{t(lang, "line_items")}</p>
-            <LineItemsTable lang={lang} items={inv.line_items} />
-          </>
-        )}
-        {inv.confidence_notes && (
-          <div className="info-box">
-            {t(lang, "extraction_notes")}: {inv.confidence_notes}
-          </div>
-        )}
-      </>
-    );
+  const data = asRecord(s);
+  const docType = result.doc_type || "other";
+  const spec = TYPE_UI_SPECS[docType] ?? defaultSpec(data);
+
+  const listKeys = new Set(Object.keys(spec.listFields));
+  const orderedScalars: string[] = [];
+  for (const k of spec.primaryFields) {
+    if (listKeys.has(k) || SKIP_KEYS.has(k)) continue;
+    if (!isEmpty(data[k]) && scalarString(data[k]) !== null) orderedScalars.push(k);
+  }
+  for (const k of Object.keys(data)) {
+    if (orderedScalars.includes(k) || listKeys.has(k) || SKIP_KEYS.has(k)) continue;
+    if (!isEmpty(data[k]) && scalarString(data[k]) !== null) orderedScalars.push(k);
   }
 
-  if (result.doc_type === "contract" || isContract(s)) {
-    const c = s as import("../api/types").ContractExtraction;
-    return (
-      <>
-        {c.title && <div className="hero-title">{c.title}</div>}
-        {c.parties && c.parties.length > 0 && (
-          <>
-            <p className="panel-label">{t(lang, "parties")}</p>
-            <div className="party-chips">
-              {c.parties.map((p, i) => (
-                <span key={i} className="party-chip">
-                  {p.name ?? "—"}
-                  {p.role ? ` (${p.role})` : ""}
-                </span>
-              ))}
-            </div>
-          </>
-        )}
-        <FieldRows
-          lang={lang}
-          pairs={[
-            ["effective_date", c.effective_date],
-            ["effective_date_iso", c.effective_date_iso],
-            ["end_date", c.end_date],
-            ["end_date_iso", c.end_date_iso],
-            ["governing_law", c.governing_law],
-          ]}
-        />
-        {c.key_terms_summary && (
-          <>
-            <p className="panel-label">{t(lang, "key_terms")}</p>
-            <div className="field-card">
-              <div className="field-row">
-                <div className="field-value" style={{ gridColumn: "1 / -1" }}>
-                  {c.key_terms_summary}
-                </div>
+  const pairs: [string, string | number | null | undefined][] = orderedScalars.map((k) => [
+    k,
+    scalarString(data[k]),
+  ]);
+
+  const hero = heroText(spec, data);
+  const isTitleHero =
+    spec.highlightFields[0] === "title" || spec.highlightFields[0] === "subject";
+
+  return (
+    <>
+      {hero &&
+        (isTitleHero ? (
+          <div className="hero-title">{hero}</div>
+        ) : (
+          <div className="hero-amount">{hero}</div>
+        ))}
+      <FieldRows lang={lang} pairs={pairs} />
+      {Object.entries(spec.listFields).map(([key, kind]) => {
+        const raw = data[key];
+        if (!Array.isArray(raw) || !raw.length) return null;
+        const labelKey =
+          key === "line_items"
+            ? "line_items"
+            : key === "items"
+              ? "items"
+              : key === "parties"
+                ? "parties"
+                : key === "transactions"
+                  ? "transactions"
+                  : key === "deductions"
+                    ? "deductions"
+                    : key === "organizations"
+                      ? "organizations"
+                      : key === "people"
+                        ? "people"
+                        : key === "key_dates"
+                          ? "key_dates"
+                          : key === "reference_ids"
+                            ? "reference_ids"
+                            : key === "amounts_mentioned"
+                              ? "amounts_mentioned"
+                              : key;
+        return (
+          <div key={key}>
+            <p className="panel-label">{t(lang, labelKey) || fieldLabel(lang, key)}</p>
+            {kind === "line_items" && (
+              <LineItemsTable lang={lang} items={raw as LineItem[]} />
+            )}
+            {kind === "parties" && (
+              <div className="party-chips">
+                {(raw as ContractParty[]).map((p, i) => (
+                  <span key={i} className="party-chip">
+                    {p.name ?? "—"}
+                    {p.role ? ` (${p.role})` : ""}
+                  </span>
+                ))}
               </div>
-            </div>
-          </>
-        )}
-        {c.confidence_notes && (
-          <div className="info-box">
-            {t(lang, "extraction_notes")}: {c.confidence_notes}
+            )}
+            {kind === "transactions" && (
+              <TransactionsTable lang={lang} rows={raw as StatementLine[]} />
+            )}
+            {kind === "named_amounts" && (
+              <NamedAmountsTable lang={lang} rows={raw as NamedAmount[]} />
+            )}
+            {kind === "strings" && <StringChips values={raw as string[]} />}
           </div>
-        )}
-      </>
-    );
-  }
-
-  if (result.doc_type === "receipt" || isReceipt(s)) {
-    const r = s as import("../api/types").ReceiptExtraction;
-    const hero = [r.total_amount, r.currency].filter(Boolean).join(" ");
-    return (
-      <>
-        {hero && <div className="hero-amount">{hero}</div>}
-        <FieldRows
-          lang={lang}
-          pairs={[
-            ["merchant", r.merchant],
-            ["receipt_number", r.receipt_number],
-            ["receipt_date", r.receipt_date],
-            ["receipt_date_iso", r.receipt_date_iso],
-            ["total_amount", r.total_amount],
-            ["total_amount_value", r.total_amount_value],
-            ["currency", r.currency],
-            ["payment_method", r.payment_method],
-          ]}
-        />
-        {r.items && r.items.length > 0 && (
-          <>
-            <p className="panel-label">{t(lang, "items")}</p>
-            <LineItemsTable lang={lang} items={r.items} />
-          </>
-        )}
-        {r.confidence_notes && (
-          <div className="info-box">
-            {t(lang, "extraction_notes")}: {r.confidence_notes}
-          </div>
-        )}
-      </>
-    );
-  }
-
-  return <div className="info-box">{t(lang, "no_fields")}</div>;
+        );
+      })}
+      {typeof data.confidence_notes === "string" && data.confidence_notes && (
+        <div className="info-box">
+          {t(lang, "extraction_notes")}: {data.confidence_notes}
+        </div>
+      )}
+    </>
+  );
 }
 
 export function summaryLine(lang: Lang, r: ProcessingResult): string {
   if (!r.success) return r.error_message || t(lang, "failed");
-  if (r.doc_type === "unknown") return t(lang, "unknown_ok");
+  if (r.doc_type === "unknown" && !r.structured) return t(lang, "unknown_ok");
   const s = r.structured;
   if (!s) return "—";
-  if (r.doc_type === "invoice" || isInvoice(s)) {
-    const inv = s as import("../api/types").InvoiceExtraction;
-    return [inv.vendor, inv.total_amount].filter(Boolean).join(" · ") || "—";
+  const data = asRecord(s);
+  const docType = r.doc_type || "other";
+  const spec = TYPE_UI_SPECS[docType];
+
+  const pick = (...keys: string[]) =>
+    keys
+      .map((k) => data[k])
+      .filter((v) => typeof v === "string" || typeof v === "number")
+      .map(String)
+      .filter(Boolean);
+
+  if (spec) {
+    const parts = pick(...spec.highlightFields, ...spec.primaryFields.slice(0, 3));
+    const unique = [...new Set(parts)].slice(0, 3);
+    if (unique.length) return unique.join(" · ");
   }
-  if (r.doc_type === "contract" || isContract(s)) {
-    const c = s as import("../api/types").ContractExtraction;
-    const n = c.parties?.length ?? 0;
-    const title = c.title || "—";
-    return n ? `${title} (${n} parties)` : title;
-  }
-  if (r.doc_type === "receipt" || isReceipt(s)) {
-    const rec = s as import("../api/types").ReceiptExtraction;
-    return [rec.merchant, rec.total_amount].filter(Boolean).join(" · ") || "—";
-  }
+
+  if (typeof data.summary === "string" && data.summary) return data.summary;
+  if (typeof data.title === "string" && data.title) return data.title;
   return typeLabel(lang, r.doc_type);
 }

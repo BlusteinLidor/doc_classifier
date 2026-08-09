@@ -18,6 +18,18 @@
   --receipt-fg: #6b4a12;
   --unknown-bg: #eceff2;
   --unknown-fg: #3d454f;
+  --family-money-bg: #e8f0fa;
+  --family-money-fg: #1e3a6e;
+  --family-logistics-bg: #e8f4f0;
+  --family-logistics-fg: #1a4d40;
+  --family-agreement-bg: #e6f2ea;
+  --family-agreement-fg: #1a4d35;
+  --family-hr-bg: #f3eaf6;
+  --family-hr-fg: #4a2d5c;
+  --family-tax-bg: #f8efd9;
+  --family-tax-fg: #6b4a12;
+  --family-other-bg: #eceff2;
+  --family-other-fg: #3d454f;
   --shadow-soft: 0 12px 40px rgba(11, 31, 58, 0.08);
   --shadow-paper: 0 8px 28px rgba(11, 31, 58, 0.1);
   --radius: 14px;
@@ -433,17 +445,44 @@ svg {
   margin-bottom: 0.55rem;
 }
 
-.sample-kind.invoice {
-  background: var(--invoice-bg);
-  color: var(--invoice-fg);
+.sample-kind.invoice,
+.sample-kind.credit_note,
+.sample-kind.receipt,
+.sample-kind.quote,
+.sample-kind.bank_statement,
+.sample-kind.utility_bill,
+.sample-kind.family-money {
+  background: var(--family-money-bg);
+  color: var(--family-money-fg);
 }
-.sample-kind.contract {
-  background: var(--contract-bg);
-  color: var(--contract-fg);
+.sample-kind.purchase_order,
+.sample-kind.delivery_note,
+.sample-kind.family-logistics {
+  background: var(--family-logistics-bg);
+  color: var(--family-logistics-fg);
 }
-.sample-kind.receipt {
-  background: var(--receipt-bg);
-  color: var(--receipt-fg);
+.sample-kind.contract,
+.sample-kind.family-agreement {
+  background: var(--family-agreement-bg);
+  color: var(--family-agreement-fg);
+}
+.sample-kind.payslip,
+.sample-kind.family-hr {
+  background: var(--family-hr-bg);
+  color: var(--family-hr-fg);
+}
+.sample-kind.tax_document,
+.sample-kind.family-tax {
+  background: var(--family-tax-bg);
+  color: var(--family-tax-fg);
+}
+.sample-kind.correspondence,
+.sample-kind.other,
+.sample-kind.unknown,
+.sample-kind.family-other,
+.sample-kind.family-unknown {
+  background: var(--family-other-bg);
+  color: var(--family-other-fg);
 }
 
 .sample-label {
@@ -640,21 +679,44 @@ svg {
   }
 }
 
-.doc-badge.invoice {
-  background: var(--invoice-bg);
-  color: var(--invoice-fg);
+.doc-badge.invoice,
+.doc-badge.credit_note,
+.doc-badge.receipt,
+.doc-badge.quote,
+.doc-badge.bank_statement,
+.doc-badge.utility_bill,
+.doc-badge.family-money {
+  background: var(--family-money-bg);
+  color: var(--family-money-fg);
 }
-.doc-badge.contract {
-  background: var(--contract-bg);
-  color: var(--contract-fg);
+.doc-badge.purchase_order,
+.doc-badge.delivery_note,
+.doc-badge.family-logistics {
+  background: var(--family-logistics-bg);
+  color: var(--family-logistics-fg);
 }
-.doc-badge.receipt {
-  background: var(--receipt-bg);
-  color: var(--receipt-fg);
+.doc-badge.contract,
+.doc-badge.family-agreement {
+  background: var(--family-agreement-bg);
+  color: var(--family-agreement-fg);
 }
-.doc-badge.unknown {
-  background: var(--unknown-bg);
-  color: var(--unknown-fg);
+.doc-badge.payslip,
+.doc-badge.family-hr {
+  background: var(--family-hr-bg);
+  color: var(--family-hr-fg);
+}
+.doc-badge.tax_document,
+.doc-badge.family-tax {
+  background: var(--family-tax-bg);
+  color: var(--family-tax-fg);
+}
+.doc-badge.correspondence,
+.doc-badge.other,
+.doc-badge.unknown,
+.doc-badge.family-other,
+.doc-badge.family-unknown {
+  background: var(--family-other-bg);
+  color: var(--family-other-fg);
 }
 
 .split {
