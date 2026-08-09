@@ -1,9 +1,12 @@
 # Portfolio demo — Document Intelligence
 
-Public demo that classifies invoices, contracts, and receipts (or **unknown**),
-extracts structured fields, and supports vision OCR for image-only PDFs.
+Public demo that classifies business PDFs (invoice, receipt, quote, PO, contract,
+bank statement, and more — or **other** / **unknown**), extracts structured fields,
+and supports vision OCR for image-only PDFs.
 
 Built with a **React** UI and **FastAPI** over the `doc_intel` pipeline.
+
+**Website paste-ready copy:** [HANDOFF.md](HANDOFF.md).
 
 ## Try it
 

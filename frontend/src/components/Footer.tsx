@@ -10,8 +10,6 @@ interface Props {
 export function Footer({ lang, maxFiles, maxMb }: Props) {
   return (
     <footer className="footer">
-      <strong>{t(lang, "about")}</strong>
-      <p>{t(lang, "about_body")}</p>
       <p>
         {t(lang, "footer_limits", { max_files: maxFiles, max_mb: maxMb })}
         <br />

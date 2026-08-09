@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import logging
 from pathlib import Path
 
@@ -48,6 +49,32 @@ def _write_page(doc: fitz.Document, lines: list[tuple[str, float]], fontfile: Pa
         y += size * 1.6
 
 
+def _write_page_he(doc: fitz.Document, lines: list[tuple[str, float]], fontfile: Path) -> None:
+    """Write a Hebrew page with proper RTL direction and right alignment."""
+    page = doc.new_page(width=595, height=842)  # A4
+    # Archive lets MuPDF resolve the font file by basename (Windows paths fail as file:// URLs).
+    font_css = f"@font-face {{font-family: hedoc; src: url({fontfile.name});}}"
+    archive = fitz.Archive(str(fontfile.parent))
+    parts: list[str] = []
+    for text, size in lines:
+        if not text.strip():
+            parts.append('<p style="margin:0.45em 0;line-height:1;">&nbsp;</p>')
+            continue
+        safe = html.escape(text)
+        parts.append(
+            f'<p style="margin:0.18em 0;font-size:{size}pt;line-height:1.45;">{safe}</p>'
+        )
+    body = "".join(parts)
+    box = fitz.Rect(54, 54, 541, 788)
+    page.insert_htmlbox(
+        box,
+        f'<div dir="rtl" style="font-family:hedoc,Arial,sans-serif;'
+        f'direction:rtl;text-align:right;unicode-bidi:isolate;">{body}</div>',
+        css=font_css,
+        archive=archive,
+    )
+
+
 def generate_invoice_en(out: Path) -> None:
     doc = fitz.open()
     lines: list[tuple[str, float]] = [
@@ -81,32 +108,30 @@ def generate_invoice_he(out: Path, fontfile: Path | None) -> None:
     lines: list[tuple[str, float]] = [
         ("חשבונית מס", 18),
         ("", 12),
-        ("ספק: חברת דוגמה בע״מ", 11),
-        ("לקוח: לקוח הדגמה בע״מ", 11),
+        ("ספק: נורתק שירותים בע״מ", 11),
+        ("לקוח: רשת אופק בע״מ", 11),
         ("מספר חשבונית: INV-HE-2201", 11),
         ("תאריך: 12/01/2025", 11),
         ("ע.מ / ח.פ: 514567890", 11),
         ("", 11),
         ("פריטים:", 12),
-        ("  שירותי ייעוץ אוטומציה  —  8 שעות  ×  ₪400  =  ₪3200", 10),
-        ("  הטמעת מערכת             —  1 יחידה ×  ₪900  =  ₪900", 10),
+        ("שירותי ייעוץ אוטומציה — 8 שעות × ₪400 = ₪3200", 10),
+        ("הטמעת מערכת — 1 יחידה × ₪900 = ₪900", 10),
         ("", 11),
         ("סה״כ לפני מע״מ: ₪4100", 11),
         ("מע״מ 17%: ₪697", 11),
         ("סה״כ לתשלום: ₪4797", 12),
         ("מטבע: ILS", 11),
-        ("", 11),
-        ("(מסמך דוגמה לתיק עבודות — אינו מסמך אמיתי.)", 9),
     ]
     if fontfile is None:
         logger.warning(
             "No Unicode TTF found; Hebrew invoice will use ASCII transliteration fallback."
         )
         lines = [
-            ("INVOICE (Hebrew sample — font fallback)", 16),
+            ("INVOICE (Hebrew — font fallback)", 16),
             ("", 12),
-            ("Vendor: Dogma Demo Ltd. (HE)", 11),
-            ("Buyer: Lakoach Demo Ltd. (HE)", 11),
+            ("Vendor: Nortek Services Ltd. (HE)", 11),
+            ("Buyer: Ofek Retail Ltd. (HE)", 11),
             ("Invoice number: INV-HE-2201", 11),
             ("Invoice date: 12/01/2025", 11),
             ("Tax ID: 514567890", 11),
@@ -119,12 +144,10 @@ def generate_invoice_he(out: Path, fontfile: Path | None) -> None:
             ("VAT 17%: 697 ILS", 11),
             ("Total amount: 4797 ILS", 12),
             ("Currency: ILS", 11),
-            ("", 11),
-            ("(Synthetic portfolio sample — not a real invoice.)", 9),
         ]
         _write_page(doc, lines, None)
     else:
-        _write_page(doc, lines, fontfile)
+        _write_page_he(doc, lines, fontfile)
     doc.save(out)
     doc.close()
     logger.info("Wrote %s", out)
@@ -169,26 +192,24 @@ def generate_contract_he(out: Path, fontfile: Path | None) -> None:
         ("כותרת: הסכם תמיכה באוטומציה עסקית", 11),
         ("", 11),
         ("צדדים:", 12),
-        ("  1. ספק: חברת ברייטאופס ייעוץ בע״מ (קבלן)", 11),
-        ("  2. לקוח: מאפיית הנמל בע״מ (לקוח)", 11),
+        ("1. ספק: ברייטאופס ייעוץ בע״מ (קבלן)", 11),
+        ("2. לקוח: מאפיית הנמל בע״מ (לקוח)", 11),
         ("", 11),
         ("תאריך תחילה: 01/01/2025", 11),
         ("תאריך סיום: 31/12/2025", 11),
         ("דין חל: מדינת ישראל", 11),
         ("", 11),
         ("תנאים עיקריים:", 12),
-        ("  הספק יספק דוחות אוטומציה חודשיים, יתחזק", 10),
-        ("  סקריפטים לקליטת לידים, ויגיב לפניות דחופות", 10),
-        ("  תוך שני ימי עסקים. התשלום חודשי מראש.", 10),
-        ("  כל צד רשאי לבטל בהודעה של 30 יום.", 10),
-        ("  סודיות נשמרת למשך שנתיים לאחר סיום ההסכם.", 10),
-        ("", 11),
-        ("(מסמך דוגמה לתיק עבודות — אינו חוזה אמיתי.)", 9),
+        ("הספק יספק דוחות אוטומציה חודשיים, יתחזק", 10),
+        ("סקריפטים לקליטת לידים, ויגיב לפניות דחופות", 10),
+        ("תוך שני ימי עסקים. התשלום חודשי מראש.", 10),
+        ("כל צד רשאי לבטל בהודעה של 30 יום.", 10),
+        ("סודיות נשמרת למשך שנתיים לאחר סיום ההסכם.", 10),
     ]
     if fontfile is None:
         logger.warning("No Unicode TTF; Hebrew contract uses Latin fallback.")
         lines = [
-            ("SERVICE AGREEMENT (Hebrew sample — font fallback)", 16),
+            ("SERVICE AGREEMENT (Hebrew — font fallback)", 16),
             ("", 12),
             ("Title: Business Automation Support Agreement (HE)", 11),
             ("Parties:", 12),
@@ -199,11 +220,10 @@ def generate_contract_he(out: Path, fontfile: Path | None) -> None:
             ("Governing law: State of Israel", 11),
             ("Key terms: Monthly automation reports; 2-day ticket SLA;", 10),
             ("  monthly fees; 30-day termination; 2-year confidentiality.", 10),
-            ("(Synthetic portfolio sample — not a real contract.)", 9),
         ]
         _write_page(doc, lines, None)
     else:
-        _write_page(doc, lines, fontfile)
+        _write_page_he(doc, lines, fontfile)
     doc.save(out)
     doc.close()
     logger.info("Wrote %s", out)
@@ -246,32 +266,29 @@ def generate_receipt_he(out: Path, fontfile: Path | None) -> None:
         ("תאריך: 18/06/2025", 11),
         ("", 11),
         ("פריטים:", 12),
-        ("  קפה שחור          1 × ₪14  = ₪14", 10),
-        ("  עוגת גבינה        1 × ₪22  = ₪22", 10),
+        ("קפה שחור — 1 × ₪14 = ₪14", 10),
+        ("עוגת גבינה — 1 × ₪22 = ₪22", 10),
         ("", 11),
         ("לפני מע״מ: ₪36", 11),
         ("מע״מ: ₪6.12", 11),
         ("סה״כ: ₪42.12", 12),
         ("מטבע: ILS", 11),
         ("אמצעי תשלום: כרטיס ****8831", 11),
-        ("", 11),
-        ("(מסמך דוגמה לתיק עבודות — אינו מסמך אמיתי.)", 9),
     ]
     if fontfile is None:
         logger.warning("No Unicode TTF; Hebrew receipt uses Latin fallback.")
         lines = [
-            ("RECEIPT (Hebrew sample — font fallback)", 16),
+            ("RECEIPT (Hebrew — font fallback)", 16),
             ("", 12),
             ("Merchant: Namal Cafe (HE)", 11),
             ("Receipt number: RCP-HE-991", 11),
             ("Date: 18/06/2025", 11),
             ("Total amount: 42.12 ILS", 12),
             ("Payment method: Card ****8831", 11),
-            ("(Synthetic portfolio sample — not a real receipt.)", 9),
         ]
         _write_page(doc, lines, None)
     else:
-        _write_page(doc, lines, fontfile)
+        _write_page_he(doc, lines, fontfile)
     doc.save(out)
     doc.close()
     logger.info("Wrote %s", out)

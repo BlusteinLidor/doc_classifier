@@ -2,18 +2,18 @@ export type Lang = "en" | "he";
 
 export const UI: Record<Lang, Record<string, string>> = {
   en: {
-    page_title: "AI Document Intelligence",
-    brand: "AI Document Intelligence",
-    brand_sub: "בינה מלאכותית למסמכים",
-    value: "Upload a PDF. Get the type and key fields in seconds.",
-    auto_run: "Run featured demo",
-    hero_hint: "Uses the Hebrew invoice sample — no upload needed",
-    skip_auto: "Browse samples",
-    samples_title: "Try a sample",
-    samples_desc: "One click. No file required.",
-    upload_title: "Or upload your own PDFs",
-    upload_help:
-      "Demo limit: max {max_files} files, {max_mb} MB each · text PDFs preferred; image-only use vision OCR",
+    page_title: "Automatic Document Analysis & Cataloging",
+    brand: "Automatic Document Analysis & Cataloging",
+    brand_sub: "ניתוח וקטלוג אוטומטי של מסמכים",
+    value:
+      "Documents land on your desktop, Google Drive, or WhatsApp. The tool detects them automatically and analyzes them — no manual work.",
+    auto_run: "Analyze documents",
+    hero_hint: "",
+    skip_auto: "Upload PDFs",
+    samples_title: "",
+    samples_desc: "",
+    upload_title: "Upload PDFs",
+    upload_help: "Up to {max_files} files, {max_mb} MB each · text PDFs preferred; scans use OCR",
     upload_cta: "Choose PDF files",
     upload_drop: "Drop PDFs here or choose files",
     analyze: "Analyze documents",
@@ -21,7 +21,7 @@ export const UI: Record<Lang, Record<string, string>> = {
     stage_classify: "Classify type",
     stage_structure: "Structure fields",
     processing: "Processing…",
-    eta: "Usually 15–45 seconds depending on OpenAI.",
+    eta: "Usually 15–45 seconds.",
     results: "Results",
     ready: "Ready — key fields extracted",
     summary_ok: "{ok} of {total} OK",
@@ -61,14 +61,12 @@ export const UI: Record<Lang, Record<string, string>> = {
     col_summary: "Summary",
     col_status: "Status",
     batch_table: "Batch overview",
-    footer_tech: "Tech: React · FastAPI · OpenAI · PyMuPDF · Pydantic V2",
-    footer_limits:
-      "Portfolio demo · sample data only · max {max_files} files / {max_mb} MB · OCR on image PDFs",
-    about: "About this demo",
-    about_body:
-      "Portfolio demonstration only — not a client production system. No accounts or stored documents.",
-    empty: "Pick a sample above or upload PDFs to start.",
-    topbar_run: "Run demo",
+    footer_tech: "React · FastAPI · OpenAI · PyMuPDF · Pydantic V2",
+    footer_limits: "Max {max_files} files / {max_mb} MB · OCR for image PDFs",
+    about: "",
+    about_body: "",
+    empty: "Upload PDFs to start.",
+    topbar_run: "Analyze",
     desc: "Description",
     qty: "Qty",
     unit_price: "Unit price",
@@ -79,18 +77,18 @@ export const UI: Record<Lang, Record<string, string>> = {
     name: "Name",
   },
   he: {
-    page_title: "בינה מלאכותית למסמכים",
-    brand: "בינה מלאכותית למסמכים",
-    brand_sub: "AI Document Intelligence",
-    value: "העלו PDF. קבלו סוג מסמך ושדות מפתח תוך שניות.",
-    auto_run: "הדגמה מומלצת",
-    hero_hint: "משתמש בחשבונית לדוגמה בעברית — בלי העלאה",
-    skip_auto: "עיינו בדוגמאות",
-    samples_title: "נסו דוגמה",
-    samples_desc: "לחיצה אחת. בלי קובץ.",
-    upload_title: "או העלו PDF משלכם",
-    upload_help:
-      "מגבלת הדגמה: עד {max_files} קבצים, {max_mb} מ״ב · מומלץ PDF עם טקסט; סריקות משתמשות ב-OCR",
+    page_title: "ניתוח וקטלוג אוטומטי של מסמכים",
+    brand: "ניתוח וקטלוג אוטומטי של מסמכים",
+    brand_sub: "",
+    value:
+      "המסמכים מגיעים למחשב / לגוגל דרייב / לווטסאפ, הכלי מזהה את זה אוטומטית, ומנתח אותם. אין צורך לעשות שום פעולה ידנית",
+    auto_run: "נתח מסמכים",
+    hero_hint: "",
+    skip_auto: "העלאת PDF",
+    samples_title: "",
+    samples_desc: "",
+    upload_title: "העלאת PDF",
+    upload_help: "עד {max_files} קבצים, {max_mb} מ״ב לקובץ · מומלץ PDF עם טקסט; סריקות עוברות OCR",
     upload_cta: "בחרו קבצי PDF",
     upload_drop: "גררו PDF לכאן או בחרו קבצים",
     analyze: "נתח מסמכים",
@@ -98,7 +96,7 @@ export const UI: Record<Lang, Record<string, string>> = {
     stage_classify: "סיווג סוג",
     stage_structure: "שדות מובנים",
     processing: "מעבד…",
-    eta: "בדרך כלל 15–45 שניות, תלוי ב-OpenAI.",
+    eta: "בדרך כלל 15–45 שניות.",
     results: "תוצאות",
     ready: "מוכן — שדות מפתח חולצו",
     summary_ok: "{ok} מתוך {total} הצליחו",
@@ -138,14 +136,12 @@ export const UI: Record<Lang, Record<string, string>> = {
     col_summary: "סיכום",
     col_status: "סטטוס",
     batch_table: "סקירת האצווה",
-    footer_tech: "טכנולוגיה: React · FastAPI · OpenAI · PyMuPDF · Pydantic V2",
-    footer_limits:
-      "הדגמת תיק עבודות · נתוני דוגמה · עד {max_files} קבצים / {max_mb} מ״ב · OCR לסריקות",
-    about: "על ההדגמה",
-    about_body:
-      "הדגמה לתיק עבודות בלבד — לא מערכת לקוח. ללא חשבונות וללא שמירת מסמכים.",
-    empty: "בחרו דוגמה למעלה או העלו PDF כדי להתחיל.",
-    topbar_run: "הדגמה",
+    footer_tech: "React · FastAPI · OpenAI · PyMuPDF · Pydantic V2",
+    footer_limits: "עד {max_files} קבצים / {max_mb} מ״ב · OCR לסריקות",
+    about: "",
+    about_body: "",
+    empty: "העלו קבצי PDF כדי להתחיל.",
+    topbar_run: "נתח",
     desc: "תיאור",
     qty: "כמות",
     unit_price: "מחיר",
@@ -155,6 +151,19 @@ export const UI: Record<Lang, Record<string, string>> = {
     balance: "יתרה",
     name: "שם",
   },
+};
+
+/** Friendly display names so built-in files don’t read as “sample_*”. */
+export const DISPLAY_FILENAMES: Record<string, { en: string; he: string }> = {
+  "sample_invoice_he.pdf": { en: "Invoice_NorTech.pdf", he: "חשבונית_נורתק.pdf" },
+  "sample_invoice_en.pdf": { en: "Invoice_Northwind.pdf", he: "חשבונית_Northwind.pdf" },
+  "sample_contract_he.pdf": { en: "Agreement_Services.pdf", he: "הסכם_שירותים.pdf" },
+  "sample_contract_en.pdf": { en: "Service_Agreement.pdf", he: "הסכם_שירותים_EN.pdf" },
+  "sample_receipt_he.pdf": { en: "Receipt_Cafe.pdf", he: "קבלה_קפה_הנמל.pdf" },
+  "sample_receipt_en.pdf": { en: "Receipt_Harbor.pdf", he: "קבלה_Harbor.pdf" },
+  "sample_quote_en.pdf": { en: "Quote_BrightOps.pdf", he: "הצעת_מחיר.pdf" },
+  "sample_purchase_order_en.pdf": { en: "PO_77801.pdf", he: "הזמנת_רכש.pdf" },
+  "sample_bank_statement_en.pdf": { en: "Bank_Statement_Mar2025.pdf", he: "דף_חשבון.pdf" },
 };
 
 export const FIELD_LABELS: Record<string, [string, string]> = {
@@ -293,11 +302,24 @@ export function fieldLabel(lang: Lang, key: string): string {
   const pair = FIELD_LABELS[key];
   if (!pair) return key.replace(/_/g, " ");
   const [en, he] = pair;
-  return lang === "he" ? `${he} / ${en}` : `${en} / ${he}`;
+  return lang === "he" ? he : en;
 }
 
 export function typeLabel(lang: Lang, docType: string | null | undefined): string {
   const dt = docType || "unknown";
   const pair = TYPE_LABELS[dt] ?? [dt.replace(/_/g, " "), dt.replace(/_/g, " ")];
   return lang === "he" ? pair[1] : pair[0];
+}
+
+export function displayFilename(lang: Lang, filename: string): string {
+  const mapped = DISPLAY_FILENAMES[filename];
+  if (mapped) return lang === "he" ? mapped.he : mapped.en;
+  return filename;
+}
+
+/** Detect if a string mostly contains Hebrew letters (for auto-dir on field values). */
+export function looksHebrew(text: string): boolean {
+  const he = (text.match(/[\u0590-\u05FF]/g) || []).join("").length;
+  const latin = (text.match(/[A-Za-z]/g) || []).join("").length;
+  return he > 0 && he >= latin;
 }

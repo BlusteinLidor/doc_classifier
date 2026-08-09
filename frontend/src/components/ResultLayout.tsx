@@ -2,7 +2,7 @@ import { downloadExport, downloadJsonLocal, samplePdfUrl } from "../api/client";
 import type { ProcessingResult } from "../api/types";
 import { typeFamily } from "../api/types";
 import type { Lang } from "../i18n/ui";
-import { t, typeLabel } from "../i18n/ui";
+import { displayFilename, looksHebrew, t, typeLabel } from "../i18n/ui";
 import { FieldPanel, summaryLine } from "./FieldPanel";
 
 interface Props {
@@ -89,9 +89,11 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
             <tbody>
               {results.map((r) => (
                 <tr key={r.filename}>
-                  <td>{r.filename}</td>
+                  <td dir="auto">{displayFilename(lang, r.filename)}</td>
                   <td>{typeLabel(lang, r.doc_type)}</td>
-                  <td>{summaryLine(lang, r)}</td>
+                  <td dir={looksHebrew(summaryLine(lang, r)) ? "rtl" : "auto"}>
+                    {summaryLine(lang, r)}
+                  </td>
                   <td>{r.success ? t(lang, "ok") : t(lang, "failed")}</td>
                 </tr>
               ))}
@@ -114,8 +116,11 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
 
         return (
           <article key={r.filename} className="result-card">
-            <h3 style={{ margin: "0 0 0.25rem", fontSize: "1.05rem" }}>
-              {r.filename}
+            <h3
+              style={{ margin: "0 0 0.25rem", fontSize: "1.05rem" }}
+              dir="auto"
+            >
+              {displayFilename(lang, r.filename)}
             </h3>
             {meta.length > 0 && (
               <p className="meta-caption">{meta.join(" · ")}</p>
@@ -143,8 +148,9 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
                   <div>
                     <p className="panel-label">{t(lang, "text_preview")}</p>
                     <pre
-                      className="pre-json"
+                      className="pre-json pre-text"
                       style={{ background: "var(--ink-soft)" }}
+                      dir={looksHebrew(r.raw_text_preview || "") ? "rtl" : "ltr"}
                     >
                       {r.raw_text_preview || "—"}
                     </pre>
@@ -158,8 +164,16 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
                   {typeLabel(lang, dt)}
                 </div>
                 {r.classification_confidence_note && (
-                  <div className="info-box">
-                    {t(lang, "confidence")}: {r.classification_confidence_note}
+                  <div
+                    className="info-box"
+                    dir={
+                      looksHebrew(r.classification_confidence_note) ? "rtl" : "auto"
+                    }
+                  >
+                    <span dir={lang === "he" ? "rtl" : "ltr"}>
+                      {t(lang, "confidence")}:{" "}
+                    </span>
+                    {r.classification_confidence_note}
                   </div>
                 )}
                 <div style={{ marginBottom: "0.75rem" }}>
@@ -200,8 +214,9 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
                       <details className="details">
                         <summary>{t(lang, "text_preview")}</summary>
                         <pre
-                          className="pre-json"
+                          className="pre-json pre-text"
                           style={{ background: "var(--ink-soft)" }}
+                          dir={looksHebrew(r.raw_text_preview) ? "rtl" : "ltr"}
                         >
                           {r.raw_text_preview}
                         </pre>

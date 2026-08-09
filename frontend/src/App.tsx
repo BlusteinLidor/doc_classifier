@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchHealth,
-  fetchSamples,
   processSample,
   processUploads,
   samplePdfUrl,
 } from "./api/client";
-import type { ProcessingResult, SampleMeta, StreamEvent } from "./api/types";
+import type { ProcessingResult, StreamEvent } from "./api/types";
 import { Footer } from "./components/Footer";
 import { Hero } from "./components/Hero";
 import {
@@ -15,7 +14,6 @@ import {
   type TimelinePhase,
 } from "./components/ProcessTimeline";
 import { ResultLayout } from "./components/ResultLayout";
-import { SampleGrid } from "./components/SampleGrid";
 import { TopBar } from "./components/TopBar";
 import { UploadZone } from "./components/UploadZone";
 import type { Lang } from "./i18n/ui";
@@ -24,9 +22,8 @@ import { t } from "./i18n/ui";
 const FEATURED_DEFAULT = "sample_invoice_he.pdf";
 
 export default function App() {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>("he");
   const [scrolled, setScrolled] = useState(false);
-  const [samples, setSamples] = useState<SampleMeta[]>([]);
   const [featured, setFeatured] = useState(FEATURED_DEFAULT);
   const [maxFiles, setMaxFiles] = useState(3);
   const [maxMb, setMaxMb] = useState(5);
@@ -54,14 +51,10 @@ export default function App() {
   useEffect(() => {
     void (async () => {
       try {
-        const [health, sampleList] = await Promise.all([
-          fetchHealth(),
-          fetchSamples(),
-        ]);
+        const health = await fetchHealth();
         setFeatured(health.featured_sample || FEATURED_DEFAULT);
         setMaxFiles(health.max_files);
         setMaxMb(health.max_mb);
-        setSamples(sampleList);
       } catch {
         // Allow UI without API during static preview
       }
@@ -84,10 +77,10 @@ export default function App() {
     if (ev.type === "file_start") {
       setStageFile(ev.filename);
       setPhase("extract");
-      setStageMsg(ev.filename);
+      setStageMsg("");
     } else if (ev.type === "stage") {
       setStageFile(ev.filename);
-      setStageMsg(ev.message);
+      setStageMsg("");
       setPhase((prev) => phaseFromStageMessage(ev.message, prev));
     } else if (ev.type === "result") {
       setPhase("done");
@@ -139,15 +132,6 @@ export default function App() {
     });
   }, [featured, runProcess]);
 
-  const runSample = useCallback(
-    (filename: string) => {
-      void runProcess((onEvent) => processSample(filename, onEvent), {
-        [filename]: samplePdfUrl(filename),
-      });
-    },
-    [runProcess],
-  );
-
   const runUploads = useCallback(
     (files: File[]) => {
       const map: Record<string, string> = {};
@@ -169,7 +153,7 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [clearBlobUrls]);
 
-  // ?demo=1 auto-starts featured sample after 1s
+  // ?demo=1 auto-starts featured document after 1s (for video capture)
   useEffect(() => {
     if (autoStarted.current) return;
     const params = new URLSearchParams(window.location.search);
@@ -182,8 +166,8 @@ export default function App() {
     }
   }, [runFeatured]);
 
-  const browseSamples = () => {
-    document.getElementById("samples")?.scrollIntoView({ behavior: "smooth" });
+  const browseUpload = () => {
+    document.getElementById("upload")?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -204,7 +188,7 @@ export default function App() {
             lang={lang}
             busy={busy}
             onRunFeatured={runFeatured}
-            onBrowseSamples={browseSamples}
+            onBrowseUpload={browseUpload}
           />
         )}
 
@@ -228,12 +212,6 @@ export default function App() {
 
         {!busy && (
           <>
-            <SampleGrid
-              lang={lang}
-              samples={samples}
-              busy={busy}
-              onSelect={runSample}
-            />
             <UploadZone
               lang={lang}
               busy={busy}

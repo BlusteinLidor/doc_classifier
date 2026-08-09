@@ -140,9 +140,15 @@ svg {
 .topbar-brand {
   font-family: var(--font-display);
   font-weight: 650;
-  font-size: 1.05rem;
+  font-size: clamp(0.82rem, 2.4vw, 1.05rem);
   letter-spacing: -0.02em;
   color: var(--ink);
+  max-width: min(58vw, 22rem);
+  line-height: 1.25;
+}
+
+[dir="rtl"] .topbar-brand {
+  text-align: right;
 }
 
 .topbar-actions {
@@ -358,10 +364,23 @@ svg {
 
 .hero-value {
   font-size: 1.15rem;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--muted);
   margin: 0 0 1.75rem;
-  max-width: 28rem;
+  max-width: 34rem;
+  unicode-bidi: plaintext;
+}
+
+[dir="rtl"] .hero-value {
+  text-align: right;
+}
+
+[dir="rtl"] .hero-copy {
+  text-align: right;
+}
+
+[dir="rtl"] .hero h1 {
+  text-align: right;
 }
 
 .hero-cta {
@@ -798,15 +817,65 @@ svg {
   }
 }
 
+.field-card-rtl .field-row {
+  direction: rtl;
+  text-align: right;
+}
+
 .field-label {
   color: var(--muted);
   font-weight: 600;
   font-size: 0.8rem;
+  unicode-bidi: isolate;
 }
 
 .field-value {
   font-weight: 650;
   word-break: break-word;
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
+.fields-he {
+  direction: rtl;
+  text-align: right;
+}
+
+.fields-he .panel-label {
+  text-align: right;
+}
+
+.fields-he .data-table th,
+.fields-he .data-table td {
+  text-align: right;
+}
+
+.pre-text {
+  unicode-bidi: plaintext;
+  text-align: start;
+  font-family: var(--font-ui), "Arial Hebrew", Tahoma, sans-serif;
+}
+
+[dir="rtl"] .panel-label {
+  text-align: right;
+}
+
+[dir="rtl"] .doc-badge {
+  direction: rtl;
+}
+
+[dir="rtl"] .results-summary {
+  text-align: right;
+}
+
+[dir="rtl"] .section-title {
+  text-align: right;
+}
+
+[dir="rtl"] .timeline-title,
+[dir="rtl"] .timeline-eta,
+[dir="rtl"] .timeline-step {
+  text-align: right;
 }
 
 .party-chips {

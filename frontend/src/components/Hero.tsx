@@ -5,10 +5,11 @@ interface Props {
   lang: Lang;
   busy: boolean;
   onRunFeatured: () => void;
-  onBrowseSamples: () => void;
+  onBrowseUpload: () => void;
 }
 
-export function Hero({ lang, busy, onRunFeatured, onBrowseSamples }: Props) {
+export function Hero({ lang, busy, onRunFeatured, onBrowseUpload }: Props) {
+  const sub = t(lang, "brand_sub");
   return (
     <section className="hero" aria-labelledby="hero-title">
       <div className="hero-stack" aria-hidden="true">
@@ -24,7 +25,7 @@ export function Hero({ lang, busy, onRunFeatured, onBrowseSamples }: Props) {
         </div>
       </div>
       <div className="hero-copy">
-        <p className="hero-sub">{t(lang, "brand_sub")}</p>
+        {sub ? <p className="hero-sub">{sub}</p> : null}
         <h1 id="hero-title">{t(lang, "brand")}</h1>
         <p className="hero-value">{t(lang, "value")}</p>
         <div className="hero-cta">
@@ -39,13 +40,12 @@ export function Hero({ lang, busy, onRunFeatured, onBrowseSamples }: Props) {
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={onBrowseSamples}
+            onClick={onBrowseUpload}
             disabled={busy}
           >
             {t(lang, "skip_auto")}
           </button>
         </div>
-        <p className="hero-hint">{t(lang, "hero_hint")}</p>
       </div>
     </section>
   );

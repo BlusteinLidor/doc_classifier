@@ -1,5 +1,5 @@
 import type { Lang } from "../i18n/ui";
-import { t } from "../i18n/ui";
+import { displayFilename, t } from "../i18n/ui";
 
 export type TimelinePhase = "idle" | "extract" | "classify" | "structure" | "done";
 
@@ -56,11 +56,13 @@ export function ProcessTimeline({ lang, phase, message, filename }: Props) {
   const order: TimelinePhase[] = ["idle", "extract", "classify", "structure", "done"];
   const idx = order.indexOf(phase);
 
+  const shownName = filename ? displayFilename(lang, filename) : "";
+
   return (
     <div className="timeline" id="processing">
-      <p className="timeline-title">
+      <p className="timeline-title" dir="auto">
         {t(lang, "processing")}
-        {filename ? ` — ${filename}` : ""}
+        {shownName ? ` — ${shownName}` : ""}
       </p>
       <p className="timeline-eta">{t(lang, "eta")}</p>
       <div className="timeline-steps">
@@ -76,7 +78,8 @@ export function ProcessTimeline({ lang, phase, message, filename }: Props) {
           );
         })}
       </div>
-      <p className="timeline-msg">{message}</p>
+      {/* Keep status line for a11y; empty when streaming English backend messages */}
+      {message ? <p className="timeline-msg">{message}</p> : null}
     </div>
   );
 }

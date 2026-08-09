@@ -9,7 +9,7 @@ import type {
 } from "../api/types";
 import { TYPE_UI_SPECS } from "../api/types";
 import type { Lang } from "../i18n/ui";
-import { fieldLabel, t, typeLabel } from "../i18n/ui";
+import { fieldLabel, looksHebrew, t, typeLabel } from "../i18n/ui";
 
 const SKIP_KEYS = new Set(["confidence_notes"]);
 
@@ -55,6 +55,24 @@ function defaultSpec(s: Record<string, unknown>): TypeUiSpec {
   };
 }
 
+function TextDirValue({
+  lang,
+  value,
+  className,
+}: {
+  lang: Lang;
+  value: string;
+  className?: string;
+}) {
+  const hebrew = looksHebrew(value);
+  const dir = hebrew ? "rtl" : lang === "he" && !/[A-Za-z]/.test(value) ? "rtl" : "auto";
+  return (
+    <div className={className} dir={dir} lang={hebrew ? "he" : undefined}>
+      {value}
+    </div>
+  );
+}
+
 function FieldRows({
   lang,
   pairs,
@@ -65,15 +83,17 @@ function FieldRows({
   const rows = pairs.filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== "");
   if (!rows.length) return null;
   return (
-    <div className="field-card">
+    <div className={`field-card${lang === "he" ? " field-card-rtl" : ""}`}>
       {rows.map(([key, val], i) => (
         <div
           key={key}
           className="field-row"
           style={{ animationDelay: `${i * 0.04}s` }}
         >
-          <div className="field-label">{fieldLabel(lang, key)}</div>
-          <div className="field-value">{String(val)}</div>
+          <div className="field-label" dir={lang === "he" ? "rtl" : "ltr"}>
+            {fieldLabel(lang, key)}
+          </div>
+          <TextDirValue lang={lang} value={String(val)} className="field-value" />
         </div>
       ))}
     </div>
@@ -101,7 +121,9 @@ function LineItemsTable({
       <tbody>
         {items.map((li, i) => (
           <tr key={i}>
-            <td>{li.description ?? ""}</td>
+            <td dir={looksHebrew(li.description ?? "") ? "rtl" : "auto"}>
+              {li.description ?? ""}
+            </td>
             <td>{li.quantity ?? ""}</td>
             <td>{li.unit_price ?? ""}</td>
             <td>{li.line_total ?? ""}</td>
@@ -234,12 +256,16 @@ export function FieldPanel({
     spec.highlightFields[0] === "title" || spec.highlightFields[0] === "subject";
 
   return (
-    <>
+    <div className={lang === "he" ? "fields-he" : undefined} dir={lang === "he" ? "rtl" : "ltr"}>
       {hero &&
         (isTitleHero ? (
-          <div className="hero-title">{hero}</div>
+          <div className="hero-title" dir={looksHebrew(hero) ? "rtl" : "auto"}>
+            {hero}
+          </div>
         ) : (
-          <div className="hero-amount">{hero}</div>
+          <div className="hero-amount" dir="auto">
+            {hero}
+          </div>
         ))}
       <FieldRows lang={lang} pairs={pairs} />
       {Object.entries(spec.listFields).map(([key, kind]) => {
@@ -275,12 +301,18 @@ export function FieldPanel({
             )}
             {kind === "parties" && (
               <div className="party-chips">
-                {(raw as ContractParty[]).map((p, i) => (
-                  <span key={i} className="party-chip">
-                    {p.name ?? "—"}
-                    {p.role ? ` (${p.role})` : ""}
-                  </span>
-                ))}
+                {(raw as ContractParty[]).map((p, i) => {
+                  const label = `${p.name ?? "—"}${p.role ? ` (${p.role})` : ""}`;
+                  return (
+                    <span
+                      key={i}
+                      className="party-chip"
+                      dir={looksHebrew(label) ? "rtl" : "auto"}
+                    >
+                      {label}
+                    </span>
+                  );
+                })}
               </div>
             )}
             {kind === "transactions" && (
@@ -294,11 +326,11 @@ export function FieldPanel({
         );
       })}
       {typeof data.confidence_notes === "string" && data.confidence_notes && (
-        <div className="info-box">
+        <div className="info-box" dir={looksHebrew(data.confidence_notes) ? "rtl" : "auto"}>
           {t(lang, "extraction_notes")}: {data.confidence_notes}
         </div>
       )}
-    </>
+    </div>
   );
 }
 
