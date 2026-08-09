@@ -1,27 +1,37 @@
 # Portfolio demo — Document Intelligence
 
-Public Streamlit demo that classifies invoices vs contracts and extracts structured fields.
+Public demo that classifies invoices, contracts, and receipts (or **unknown**),
+extracts structured fields, and supports vision OCR for image-only PDFs.
+
+Built with a **React** UI and **FastAPI** over the `doc_intel` pipeline.
 
 ## Try it
 
 **Live demo:** https://doc-classifier-production-8376.up.railway.app
 
 1. Open the URL above.
-2. Click one of the **sample** buttons (English invoice, Hebrew invoice, or English contract).
-3. Wait for classification + extracted fields (usually under a minute).
+2. Optionally switch **EN / עב**, then click **Run featured demo** (or `?demo=1`).
+3. Wait for the stage timeline, then classification + extracted fields (usually 15–45 seconds).
 
 No login. Sample data only — not a live client system.
 
-**Reset:** refresh the browser page.
+**Reset:** use **Clear results** / **Analyze another**, or refresh the browser.
 
 ## Local run
 
 ```bash
-pip install -e .
-# or: pip install -r requirements.txt
+pip install -e ".[dev]"
+cd frontend && npm install && cd ..
 cp .env.example .env   # set OPENAI_API_KEY
-streamlit run app/streamlit_app.py
+
+# Terminal 1
+uvicorn backend.main:app --reload --port 8000
+
+# Terminal 2
+cd frontend && npm run dev
 ```
+
+Open http://127.0.0.1:5173 — video mode: `?demo=1`
 
 Regenerate sample PDFs (optional):
 
@@ -29,17 +39,17 @@ Regenerate sample PDFs (optional):
 python scripts/generate_samples.py
 ```
 
+Run unit tests:
+
+```bash
+pytest
+```
+
 ## Environment / secrets
 
 | Name | Required | Where |
 |------|----------|--------|
-| `OPENAI_API_KEY` | Yes | Local: `.env`. Streamlit Community Cloud: **App settings → Secrets** |
-
-Streamlit secrets example:
-
-```toml
-OPENAI_API_KEY = "sk-..."
-```
+| `OPENAI_API_KEY` | Yes | Local: `.env`. Railway: service variable |
 
 ## Deploy
 
@@ -49,31 +59,34 @@ The public portfolio demo currently runs on Railway:
 
 https://doc-classifier-production-8376.up.railway.app
 
-- Dockerfile + `railway.toml` in the repo
+- Multi-stage Dockerfile builds the React SPA and serves it from FastAPI
 - Set `OPENAI_API_KEY` as a Railway service variable
+- Healthcheck: `GET /api/health`
 - Redeploy after secret changes: `railway redeploy`
 
-### Streamlit Community Cloud (optional alternate)
+Demo limits (cost / abuse): max **3** PDFs per run, **5 MB** each; OCR limited to first **3** pages.
 
-One-click (pre-filled):  
-[Deploy on Streamlit Community Cloud](https://share.streamlit.io/deploy?repository=BlusteinLidor/doc_classifier&branch=master&mainModule=app/streamlit_app.py)
+## API surface (demo)
 
-Manual steps:
-
-1. Repo is on GitHub: `BlusteinLidor/doc_classifier` (public).
-2. Open the link above (or [share.streamlit.io](https://share.streamlit.io) → **Create app**).
-3. Confirm branch `master`, main file `app/streamlit_app.py`.
-4. **Secrets** (required for classify/extract to work):
-
-   ```toml
-   OPENAI_API_KEY = "sk-..."
-   ```
-
-5. Deploy. Public HTTPS URL looks like `https://<app-name>.streamlit.app`.
-
-Demo limits (cost / abuse): max **3** PDFs per run, **5 MB** each.
+| Method | Path | Notes |
+|--------|------|--------|
+| GET | `/api/health` | Health + demo limits |
+| GET | `/api/samples` | Sample metadata |
+| GET | `/api/samples/{filename}` | Sample PDF bytes |
+| POST | `/api/process/sample` | Process built-in sample (SSE) |
+| POST | `/api/process` | Upload PDFs (SSE) |
+| POST | `/api/export/json` | Batch JSON download |
+| POST | `/api/export/csv` | Batch CSV download |
 
 ## Notes
 
-- Text-based PDFs only (no OCR for scanned images).
+- Prefer text PDFs; image-only PDFs fall back to **vision OCR** (OpenAI).
+- Types: invoice · contract · receipt · unknown.
 - Model: `gpt-4o-mini` (see `src/doc_intel/openai_client.py`).
+
+## Recording a short video
+
+1. Open `/?demo=1` (or click **Run featured demo**).
+2. Leave the language toggle visible; switch EN ↔ עב after results appear.
+3. Show the type badge + total amount, then **Download JSON**.
+4. End on the footer (portfolio demo · sample data only).

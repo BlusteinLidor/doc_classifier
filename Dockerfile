@@ -1,8 +1,13 @@
-# Deploy Streamlit on Railway (alternative HTTPS host when Streamlit Cloud
-# interactive deploy is unavailable). Primary docs still in DEMO.md.
+# Multi-stage: React SPA + FastAPI
+
+FROM node:20-slim AS frontend-build
+WORKDIR /fe
+COPY frontend/package.json frontend/package-lock.json* ./
+RUN npm install
+COPY frontend/ ./
+RUN npm run build
 
 FROM python:3.11-slim
-
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -12,12 +17,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY src ./src
+COPY samples ./samples
+COPY backend ./backend
+COPY --from=frontend-build /fe/dist ./frontend/dist
 
 ENV PYTHONPATH=/app/src
-ENV STREAMLIT_SERVER_HEADLESS=true
-ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+ENV PYTHONUNBUFFERED=1
 
-EXPOSE 8501
+EXPOSE 8000
 
-CMD streamlit run app/streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}

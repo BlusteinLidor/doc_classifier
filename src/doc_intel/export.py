@@ -5,9 +5,39 @@ from __future__ import annotations
 import csv
 import io
 import json
+from datetime import date
 from typing import Any
 
 from doc_intel.models import ProcessingResult
+
+# Stable column order for mixed batches (helps Excel pivot).
+_STABLE_EXTRACTED_KEYS = [
+    "vendor",
+    "merchant",
+    "invoice_number",
+    "receipt_number",
+    "title",
+    "buyer",
+    "invoice_date",
+    "invoice_date_iso",
+    "receipt_date",
+    "receipt_date_iso",
+    "effective_date",
+    "effective_date_iso",
+    "end_date",
+    "end_date_iso",
+    "total_amount",
+    "total_amount_value",
+    "currency",
+    "tax_id",
+    "payment_method",
+    "governing_law",
+    "parties",
+    "key_terms_summary",
+    "line_items",
+    "items",
+    "confidence_notes",
+]
 
 
 def _flatten_value(value: Any) -> str:
@@ -18,9 +48,20 @@ def _flatten_value(value: Any) -> str:
     return str(value)
 
 
+def branded_export_basename(prefix: str = "extraction") -> str:
+    """Return filename stem like extraction_2026-08-04."""
+    return f"{prefix}_{date.today().isoformat()}"
+
+
 def results_to_json_bytes(results: list[ProcessingResult]) -> bytes:
     payload = [r.model_dump(mode="json") for r in results]
     return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def single_result_to_json_bytes(result: ProcessingResult) -> bytes:
+    return json.dumps(result.model_dump(mode="json"), ensure_ascii=False, indent=2).encode(
+        "utf-8"
+    )
 
 
 def results_to_csv_bytes(
@@ -36,8 +77,11 @@ def results_to_csv_bytes(
             "filename": r.filename,
             "success": str(r.success).lower(),
             "doc_type": r.doc_type or "",
+            "classification_confidence_note": r.classification_confidence_note or "",
             "error_message": r.error_message or "",
             "warnings": " | ".join(r.warnings),
+            "latency_ms": "" if r.latency_ms is None else str(r.latency_ms),
+            "used_ocr": str(r.used_ocr).lower(),
         }
         preview = r.raw_text_preview.replace("\r\n", "\n")
         if len(preview) > preview_max_chars:
@@ -48,29 +92,32 @@ def results_to_csv_bytes(
                 row[f"extracted_{key}"] = _flatten_value(val)
         rows.append(row)
 
+    base = [
+        "filename",
+        "success",
+        "doc_type",
+        "classification_confidence_note",
+        "error_message",
+        "warnings",
+        "latency_ms",
+        "used_ocr",
+        "raw_text_preview",
+    ]
     if not rows:
-        fieldnames = [
-            "filename",
-            "success",
-            "doc_type",
-            "error_message",
-            "warnings",
-            "raw_text_preview",
-        ]
+        fieldnames = base
     else:
-        base = [
-            "filename",
-            "success",
-            "doc_type",
-            "error_message",
-            "warnings",
-            "raw_text_preview",
-        ]
         all_keys: set[str] = set()
         for row in rows:
             all_keys.update(row.keys())
-        extras = sorted(k for k in all_keys if k not in base)
-        fieldnames = [k for k in base if k in all_keys] + extras
+        stable_extras = [
+            f"extracted_{k}"
+            for k in _STABLE_EXTRACTED_KEYS
+            if f"extracted_{k}" in all_keys
+        ]
+        other_extras = sorted(
+            k for k in all_keys if k not in base and k not in stable_extras
+        )
+        fieldnames = [k for k in base if k in all_keys] + stable_extras + other_extras
 
     buf = io.StringIO()
     if utf8_bom:

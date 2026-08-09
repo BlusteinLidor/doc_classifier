@@ -8,3 +8,6 @@ __pycache__/
 .mypy_cache/
 .DS_Store
 .railway/
+frontend/node_modules/
+frontend/dist/
+
