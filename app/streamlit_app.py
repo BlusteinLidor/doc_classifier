@@ -26,6 +26,7 @@ from doc_intel.export import (
     single_result_to_json_bytes,
 )
 from doc_intel.models import ProcessingResult, StructuredExtraction
+from doc_intel.normalize import compose_amount_with_currency
 from doc_intel.pipeline import process_pdf_bytes
 from doc_intel.registry import get_type_spec
 
@@ -598,6 +599,19 @@ def _value_in_preview(value: str | None, preview: str) -> bool:
     return len(v) >= 2 and v in preview
 
 
+_MONEY_HIGHLIGHT_KEYS = frozenset(
+    {
+        "total_amount",
+        "amount_due",
+        "amount",
+        "closing_balance",
+        "net_pay",
+        "opening_balance",
+        "gross_pay",
+    }
+)
+
+
 def _field_rows_html(
     pairs: list[tuple[str, str | None]],
     *,
@@ -637,12 +651,16 @@ def _render_structured_cards(
     primary = list(spec.primary_fields) if spec else []
     highlight = list(spec.highlight_fields) if spec else []
 
-    hero_parts = [
-        str(data[k])
-        for k in highlight
-        if data.get(k) is not None and str(data[k]).strip() != ""
-    ]
-    hero = " ".join(hero_parts).strip()
+    money_key = next((k for k in highlight if k in _MONEY_HIGHLIGHT_KEYS), None)
+    if money_key and "currency" in highlight:
+        hero = compose_amount_with_currency(data.get(money_key), data.get("currency"))
+    else:
+        hero_parts = [
+            str(data[k])
+            for k in highlight
+            if data.get(k) is not None and str(data[k]).strip() != ""
+        ]
+        hero = " ".join(hero_parts).strip()
     if hero:
         is_title = bool(highlight and highlight[0] in ("title", "subject"))
         cls = "di-hero-title" if is_title else "di-hero-amount"
@@ -802,22 +820,37 @@ def _batch_summary_row(r: ProcessingResult) -> dict[str, str]:
     elif r.structured is not None:
         data = r.structured.model_dump()
         spec = get_type_spec(r.doc_type or "other")
-        keys: list[str] = []
-        if spec:
-            keys.extend(spec.highlight_fields)
-            keys.extend(spec.primary_fields[:3])
         parts: list[str] = []
         seen: set[str] = set()
-        for k in keys:
-            v = data.get(k)
-            if v is None or isinstance(v, (list, dict)):
-                continue
-            s = str(v).strip()
-            if s and s not in seen:
-                seen.add(s)
-                parts.append(s)
-            if len(parts) >= 3:
-                break
+        if spec:
+            money_key = next(
+                (k for k in spec.highlight_fields if k in _MONEY_HIGHLIGHT_KEYS),
+                None,
+            )
+            if money_key and "currency" in spec.highlight_fields:
+                money = compose_amount_with_currency(
+                    data.get(money_key), data.get("currency")
+                )
+                if money and money not in seen:
+                    seen.add(money)
+                    parts.append(money)
+                keys = [
+                    k
+                    for k in list(spec.highlight_fields) + list(spec.primary_fields[:3])
+                    if k not in (money_key, "currency", "total_amount_value")
+                ]
+            else:
+                keys = list(spec.highlight_fields) + list(spec.primary_fields[:3])
+            for k in keys:
+                v = data.get(k)
+                if v is None or isinstance(v, (list, dict)):
+                    continue
+                s = str(v).strip()
+                if s and s not in seen:
+                    seen.add(s)
+                    parts.append(s)
+                if len(parts) >= 3:
+                    break
         if not parts and data.get("summary"):
             parts.append(str(data["summary"]))
         if not parts and data.get("title"):

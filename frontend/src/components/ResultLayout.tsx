@@ -4,12 +4,16 @@ import { typeFamily } from "../api/types";
 import type { Lang } from "../i18n/ui";
 import { displayFilename, looksHebrew, t, typeLabel } from "../i18n/ui";
 import { FieldPanel, summaryLine } from "./FieldPanel";
+import type { ReactNode } from "react";
 
 interface Props {
   lang: Lang;
   results: ProcessingResult[];
   pdfUrls: Record<string, string>;
   onClear: () => void;
+  /** Index of the most recently added result (highlight + scroll target). */
+  newestIndex?: number | null;
+  processingSlot?: ReactNode;
 }
 
 function PdfPreview({
@@ -27,7 +31,14 @@ function PdfPreview({
   return <iframe className="pdf-frame" title={filename} src={url} />;
 }
 
-export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
+export function ResultLayout({
+  lang,
+  results,
+  pdfUrls,
+  onClear,
+  newestIndex = null,
+  processingSlot,
+}: Props) {
   const ok = results.filter((r) => r.success).length;
   const total = results.length;
   const latencies = results
@@ -40,39 +51,51 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
 
   return (
     <section className="section" id="results">
-      <div className="results-header">
-        <div className="results-summary">
-          <strong>{t(lang, "ready")}</strong>
-          <span>
-            {t(lang, "summary_ok", { ok, total })}
-            {latSec != null ? ` · ${t(lang, "latency", { sec: latSec })}` : ""}
-          </span>
+      {results.length > 0 && (
+        <div className="results-header">
+          <div className="results-summary">
+            <strong>{t(lang, "ready")}</strong>
+            <span>
+              {t(lang, "summary_ok", { ok, total })}
+              {latSec != null ? ` · ${t(lang, "latency", { sec: latSec })}` : ""}
+            </span>
+          </div>
+          <div className="results-actions">
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => void downloadExport(results, "json")}
+            >
+              {t(lang, "download_json")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => void downloadExport(results, "csv")}
+            >
+              {t(lang, "download_csv")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onClear}
+            >
+              {t(lang, "clear")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={onClear}
+            >
+              {t(lang, "analyze_another")}
+            </button>
+          </div>
         </div>
-        <div className="results-actions">
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => void downloadExport(results, "json")}
-          >
-            {t(lang, "download_json")}
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={() => void downloadExport(results, "csv")}
-          >
-            {t(lang, "download_csv")}
-          </button>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={onClear}>
-            {t(lang, "clear")}
-          </button>
-          <button type="button" className="btn btn-primary btn-sm" onClick={onClear}>
-            {t(lang, "analyze_another")}
-          </button>
-        </div>
-      </div>
+      )}
 
-      <h2 className="section-title">{t(lang, "results")}</h2>
+      {results.length > 0 && (
+        <h2 className="section-title">{t(lang, "results")}</h2>
+      )}
 
       {results.length > 1 && (
         <>
@@ -87,8 +110,8 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
               </tr>
             </thead>
             <tbody>
-              {results.map((r) => (
-                <tr key={r.filename}>
+              {results.map((r, i) => (
+                <tr key={`${r.filename}-${i}`}>
                   <td dir="auto">{displayFilename(lang, r.filename)}</td>
                   <td>{typeLabel(lang, r.doc_type)}</td>
                   <td dir={looksHebrew(summaryLine(lang, r)) ? "rtl" : "auto"}>
@@ -102,7 +125,7 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
         </>
       )}
 
-      {results.map((r) => {
+      {results.map((r, i) => {
         const url = pdfUrls[r.filename] ?? samplePdfUrl(r.filename);
         const meta: string[] = [];
         if (r.latency_ms != null) {
@@ -113,9 +136,14 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
         if (r.used_ocr) meta.push(t(lang, "used_ocr"));
         const dt = r.doc_type || "unknown";
         const family = typeFamily(dt);
+        const isNewest = newestIndex === i;
 
         return (
-          <article key={r.filename} className="result-card">
+          <article
+            key={`${r.filename}-${i}`}
+            id={`result-${i}`}
+            className={`result-card${isNewest ? " result-card-new" : ""}`}
+          >
             <h3
               style={{ margin: "0 0 0.25rem", fontSize: "1.05rem" }}
               dir="auto"
@@ -229,6 +257,8 @@ export function ResultLayout({ lang, results, pdfUrls, onClear }: Props) {
           </article>
         );
       })}
+
+      {processingSlot}
     </section>
   );
 }

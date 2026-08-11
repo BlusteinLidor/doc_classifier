@@ -24,7 +24,8 @@ import { UploadZone } from "./components/UploadZone";
 import type { Lang } from "./i18n/ui";
 import { demoSamplesForLang, featuredSampleForLang, t } from "./i18n/ui";
 
-const INCOMING_BANNER_MS = 2200;
+const INCOMING_BANNER_MS = 2800;
+const TOAST_AFTER_START_MS = 5200;
 const FIRST_INCOMING_DELAY_MS = 2500;
 const SOURCES: IncomingSource[] = ["desktop", "drive", "whatsapp"];
 
@@ -38,6 +39,7 @@ export default function App() {
   const [stageMsg, setStageMsg] = useState("");
   const [stageFile, setStageFile] = useState<string | undefined>();
   const [results, setResults] = useState<ProcessingResult[]>([]);
+  const [newestIndex, setNewestIndex] = useState<number | null>(null);
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({});
   const blobUrlsRef = useRef<string[]>([]);
   const autoStarted = useRef(false);
@@ -58,8 +60,11 @@ export default function App() {
   const langRef = useRef<Lang>(lang);
   const scheduleTimerRef = useRef<number | null>(null);
   const bannerTimerRef = useRef<number | null>(null);
+  const toastHideTimerRef = useRef<number | null>(null);
   const hasQueuedFirstRef = useRef(false);
   const runSampleRef = useRef<(name: string) => void>(() => undefined);
+  const followNewDocRef = useRef(false);
+  const resultsLenRef = useRef(0);
 
   const featured = featuredSampleForLang(lang);
 
@@ -80,6 +85,10 @@ export default function App() {
   useEffect(() => {
     stageFileRef.current = stageFile;
   }, [stageFile]);
+
+  useEffect(() => {
+    resultsLenRef.current = results.length;
+  }, [results.length]);
 
   useEffect(() => {
     document.documentElement.lang = lang === "he" ? "he" : "en";
@@ -114,6 +123,9 @@ export default function App() {
       if (bannerTimerRef.current != null) {
         window.clearTimeout(bannerTimerRef.current);
       }
+      if (toastHideTimerRef.current != null) {
+        window.clearTimeout(toastHideTimerRef.current);
+      }
     };
   }, []);
 
@@ -121,6 +133,16 @@ export default function App() {
     for (const u of blobUrlsRef.current) URL.revokeObjectURL(u);
     blobUrlsRef.current = [];
     setPdfUrls({});
+  }, []);
+
+  const scrollToProcessing = useCallback(() => {
+    followNewDocRef.current = true;
+    requestAnimationFrame(() => {
+      document.getElementById("processing")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
   }, []);
 
   const handleStreamEvent = useCallback((ev: StreamEvent) => {
@@ -153,7 +175,6 @@ export default function App() {
       processingRef.current = true;
       pendingIncomingRef.current = false;
       setBusy(true);
-      setResults([]);
       setPhase("extract");
       setStageMsg("");
       try {
@@ -161,23 +182,44 @@ export default function App() {
           setPdfUrls((prev) => ({ ...prev, ...urlMap }));
         }
         const out = await runner(handleStreamEvent);
-        setResults(out);
+        const baseLen = resultsLenRef.current;
+        setResults((prev) => {
+          const next = [...prev, ...out];
+          setNewestIndex(next.length > 0 ? next.length - 1 : null);
+          return next;
+        });
         setPhase("done");
+        const scrollToIdx =
+          out.length > 0 ? baseLen + out.length - 1 : null;
         requestAnimationFrame(() => {
-          document.getElementById("results")?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
+          if (followNewDocRef.current && scrollToIdx != null) {
+            followNewDocRef.current = false;
+            document.getElementById(`result-${scrollToIdx}`)?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          } else if (baseLen === 0) {
+            followNewDocRef.current = false;
+            document.getElementById("results")?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          } else {
+            followNewDocRef.current = false;
+          }
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        setResults([
-          {
+        setResults((prev) => {
+          const failed: ProcessingResult = {
             filename: stageFileRef.current || "error",
             success: false,
             error_message: message,
-          },
-        ]);
+          };
+          const next = [...prev, failed];
+          setNewestIndex(next.length - 1);
+          return next;
+        });
       } finally {
         setBusy(false);
         processingRef.current = false;
@@ -221,11 +263,23 @@ export default function App() {
 
   const clearResults = useCallback(() => {
     setResults([]);
+    setNewestIndex(null);
     clearBlobUrls();
     setPhase("idle");
     setStageMsg("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [clearBlobUrls]);
+
+  const clearToastTimers = useCallback(() => {
+    if (bannerTimerRef.current != null) {
+      window.clearTimeout(bannerTimerRef.current);
+      bannerTimerRef.current = null;
+    }
+    if (toastHideTimerRef.current != null) {
+      window.clearTimeout(toastHideTimerRef.current);
+      toastHideTimerRef.current = null;
+    }
+  }, []);
 
   const triggerIncoming = useCallback(() => {
     if (
@@ -248,16 +302,18 @@ export default function App() {
 
     setIncoming({ filename: name, source });
     setSettingsOpen(false);
+    clearToastTimers();
 
-    if (bannerTimerRef.current != null) {
-      window.clearTimeout(bannerTimerRef.current);
-    }
+    // Brief “detected” beat, then start processing while toast remains clickable
     bannerTimerRef.current = window.setTimeout(() => {
       bannerTimerRef.current = null;
-      setIncoming(null);
       runSampleRef.current(name);
+      toastHideTimerRef.current = window.setTimeout(() => {
+        toastHideTimerRef.current = null;
+        setIncoming(null);
+      }, TOAST_AFTER_START_MS);
     }, INCOMING_BANNER_MS);
-  }, []);
+  }, [clearToastTimers]);
 
   const scheduleNextIncoming = useCallback(
     (delayMs: number) => {
@@ -285,10 +341,7 @@ export default function App() {
       clearSchedule();
       hasQueuedFirstRef.current = false;
       pendingIncomingRef.current = false;
-      if (bannerTimerRef.current != null) {
-        window.clearTimeout(bannerTimerRef.current);
-        bannerTimerRef.current = null;
-      }
+      clearToastTimers();
       setIncoming(null);
       return;
     }
@@ -301,7 +354,7 @@ export default function App() {
     return () => {
       // only clear on interval change / unmount handled by intervalMs===0 branch
     };
-  }, [intervalMs, scheduleNextIncoming, clearSchedule]);
+  }, [intervalMs, scheduleNextIncoming, clearSchedule, clearToastTimers]);
 
   // After each finished run, queue the next arrival when demo mode is on
   useEffect(() => {
@@ -331,6 +384,16 @@ export default function App() {
     document.getElementById("upload")?.scrollIntoView({ behavior: "smooth" });
   };
 
+  const showProcessing = busy || Boolean(incoming);
+  const processingTimeline = showProcessing ? (
+    <ProcessTimeline
+      lang={lang}
+      phase={incoming && !busy ? "extract" : phase}
+      message={stageMsg}
+      filename={incoming?.filename ?? stageFile}
+    />
+  ) : null;
+
   return (
     <div className="app">
       <div className="app-bg" aria-hidden="true" />
@@ -354,6 +417,7 @@ export default function App() {
             filename={incoming.filename}
             source={incoming.source}
             visible
+            onOpen={scrollToProcessing}
           />
         )}
 
@@ -366,25 +430,20 @@ export default function App() {
           />
         )}
 
-        {(busy || incoming) && (
-          <ProcessTimeline
-            lang={lang}
-            phase={incoming && !busy ? "extract" : phase}
-            message={stageMsg}
-            filename={incoming?.filename ?? stageFile}
-          />
-        )}
-
-        {results.length > 0 && !busy && !incoming && (
+        {results.length > 0 ? (
           <ResultLayout
             lang={lang}
             results={results}
             pdfUrls={pdfUrls}
             onClear={clearResults}
+            newestIndex={newestIndex}
+            processingSlot={processingTimeline}
           />
+        ) : (
+          processingTimeline
         )}
 
-        {!busy && !incoming && (
+        {!busy && (
           <>
             <UploadZone
               lang={lang}
@@ -393,7 +452,7 @@ export default function App() {
               maxMb={maxMb}
               onAnalyze={runUploads}
             />
-            {results.length === 0 && (
+            {results.length === 0 && !incoming && (
               <p className="empty-hint">{t(lang, "empty")}</p>
             )}
           </>

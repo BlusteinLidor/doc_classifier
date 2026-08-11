@@ -13,6 +13,68 @@ import { fieldLabel, looksHebrew, t, typeLabel } from "../i18n/ui";
 
 const SKIP_KEYS = new Set(["confidence_notes"]);
 
+/** Amount fields that are often paired with a separate `currency` highlight. */
+const MONEY_HIGHLIGHT_KEYS = new Set([
+  "total_amount",
+  "amount_due",
+  "amount",
+  "closing_balance",
+  "net_pay",
+  "opening_balance",
+  "gross_pay",
+]);
+
+/** Regexes for symbols/codes already embedded in an amount string. */
+const CURRENCY_IN_AMOUNT: Record<string, RegExp> = {
+  USD: /\$|USD|US\$/i,
+  ILS: /₪|ILS|NIS|ש["״']?\s*ח/,
+  EUR: /€|EUR/i,
+  GBP: /£|GBP/i,
+};
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** True when `amount` already shows the same currency as `currency` (symbol or code). */
+export function amountIncludesCurrency(amount: string, currency: string): boolean {
+  const amt = amount.trim();
+  const cur = currency.trim();
+  if (!amt || !cur) return false;
+  if (amt.toUpperCase().includes(cur.toUpperCase())) return true;
+  const code = cur.toUpperCase().replace(/[^A-Z]/g, "");
+  const re = CURRENCY_IN_AMOUNT[code];
+  if (re?.test(amt)) return true;
+  if ((cur.includes("₪") || code === "ILS") && /₪/.test(amt)) return true;
+  if ((cur.includes("$") || code === "USD") && /\$/.test(amt)) return true;
+  // Bare code token match (word-ish) when amount ends with "USD" etc.
+  try {
+    return new RegExp(`(?:^|\\s)${escapeRegExp(cur)}(?:\\s|$)`, "i").test(amt);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Combine amount + currency once. Prefer the amount's own symbol/code when present
+ * so we never show "2104.83 USD USD" or "₪4797 ILS".
+ */
+export function composeAmountWithCurrency(
+  amount: string | number | null | undefined,
+  currency: string | null | undefined,
+): string {
+  const amt =
+    amount === null || amount === undefined
+      ? ""
+      : String(amount).trim();
+  const cur = currency?.trim() ?? "";
+  if (!amt && !cur) return "";
+  if (!amt) return cur;
+  if (!cur) return amt;
+  if (amountIncludesCurrency(amt, cur)) return amt;
+  return `${amt} ${cur}`;
+}
+
 function asRecord(s: StructuredExtraction): Record<string, unknown> {
   return s as Record<string, unknown>;
 }
@@ -208,7 +270,27 @@ function StringChips({ values }: { values: string[] }) {
 }
 
 function heroText(spec: TypeUiSpec, data: Record<string, unknown>): string {
-  const parts = spec.highlightFields
+  const fields = spec.highlightFields;
+  // e.g. highlightFields: ["total_amount", "currency"] — join without double currency
+  if (
+    fields.length >= 2 &&
+    fields.includes("currency") &&
+    fields.some((k) => MONEY_HIGHLIGHT_KEYS.has(k))
+  ) {
+    const amountKey = fields.find((k) => MONEY_HIGHLIGHT_KEYS.has(k));
+    if (amountKey) {
+      const amount = data[amountKey];
+      const currency = data.currency;
+      const composed = composeAmountWithCurrency(
+        typeof amount === "string" || typeof amount === "number" ? amount : null,
+        typeof currency === "string" ? currency : null,
+      );
+      if (composed) return composed;
+    }
+  }
+
+  const parts = fields
+    .filter((k) => k !== "currency" || !fields.some((f) => MONEY_HIGHLIGHT_KEYS.has(f)))
     .map((k) => data[k])
     .filter((v) => typeof v === "string" || typeof v === "number")
     .map(String)
@@ -351,6 +433,25 @@ export function summaryLine(lang: Lang, r: ProcessingResult): string {
       .filter(Boolean);
 
   if (spec) {
+    const moneyKey = spec.highlightFields.find((k) => MONEY_HIGHLIGHT_KEYS.has(k));
+    if (moneyKey && spec.highlightFields.includes("currency")) {
+      const money = composeAmountWithCurrency(
+        typeof data[moneyKey] === "string" || typeof data[moneyKey] === "number"
+          ? (data[moneyKey] as string | number)
+          : null,
+        typeof data.currency === "string" ? data.currency : null,
+      );
+      const rest = pick(
+        ...spec.highlightFields.filter(
+          (k) => k !== moneyKey && k !== "currency",
+        ),
+        ...spec.primaryFields
+          .filter((k) => k !== moneyKey && k !== "currency" && k !== "total_amount_value")
+          .slice(0, 2),
+      );
+      const unique = [...new Set([money, ...rest].filter(Boolean))].slice(0, 3);
+      if (unique.length) return unique.join(" · ");
+    }
     const parts = pick(...spec.highlightFields, ...spec.primaryFields.slice(0, 3));
     const unique = [...new Set(parts)].slice(0, 3);
     if (unique.length) return unique.join(" · ");

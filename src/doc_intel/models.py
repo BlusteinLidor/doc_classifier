@@ -36,7 +36,11 @@ class DocumentKindResult(BaseModel):
     )
     confidence_note: str | None = Field(
         default=None,
-        description="Short optional note on why this classification was chosen.",
+        description=(
+            "Short note (1–2 sentences) explaining the classification choice, "
+            "written in the same primary language as the document "
+            "(Hebrew for Hebrew text, English for English text)."
+        ),
     )
 
 

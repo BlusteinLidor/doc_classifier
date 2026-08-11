@@ -40,7 +40,10 @@ Disambiguation:
 Choose the best-fit type. Prefer a specific type over "other". Prefer "other" over "unknown"
 when the text is readable business content. Use "unknown" only when content is unusable
 or clearly not a business document. Use only the excerpt provided.
-Include a short confidence_note explaining the choice.
+Include a short confidence_note (1–2 sentences) explaining the choice.
+Language for confidence_note: write it entirely in the primary language of the document text
+(Hebrew documents → full Hebrew note; English documents → English note). Do not answer in
+English when the excerpt is mainly Hebrew.
 """
 
 USER_CLASSIFY_TEMPLATE = """Filename: {filename}

@@ -29,6 +29,7 @@ from doc_intel.models import (  # noqa: E402
     UtilityBillExtraction,
 )
 from doc_intel.normalize import (  # noqa: E402
+    compose_amount_with_currency,
     normalize_structured,
     parse_amount_value,
     parse_date_iso,
@@ -67,6 +68,26 @@ def test_parse_amount_value(raw: str | None, expected: float | None) -> None:
 )
 def test_parse_date_iso(raw: str | None, expected: str | None) -> None:
     assert parse_date_iso(raw) == expected
+
+
+@pytest.mark.parametrize(
+    "amount,currency,expected",
+    [
+        ("2104.83 USD", "USD", "2104.83 USD"),
+        ("2104.83", "USD", "2104.83 USD"),
+        ("₪4797", "ILS", "₪4797"),
+        ("4797 ILS", "ILS", "4797 ILS"),
+        ("4797", "ILS", "4797 ILS"),
+        ("$100", "USD", "$100"),
+        ("100", None, "100"),
+        (None, "USD", "USD"),
+        ("", "", ""),
+    ],
+)
+def test_compose_amount_with_currency(
+    amount: str | None, currency: str | None, expected: str
+) -> None:
+    assert compose_amount_with_currency(amount, currency) == expected
 
 
 def test_normalize_invoice_fills_numeric_and_iso() -> None:

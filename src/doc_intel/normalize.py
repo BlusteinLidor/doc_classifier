@@ -19,6 +19,50 @@ _amount_chunk_re = re.compile(r"[-+]?(?:\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d+)?|\d+(
 _ISO_SUFFIX = "_iso"
 _VALUE_SUFFIX = "_value"
 
+_CURRENCY_IN_AMOUNT: dict[str, re.Pattern[str]] = {
+    "USD": re.compile(r"\$|USD|US\$", re.I),
+    "ILS": re.compile(r"₪|ILS|NIS|ש[\"״']?\s*ח", re.I),
+    "EUR": re.compile(r"€|EUR", re.I),
+    "GBP": re.compile(r"£|GBP", re.I),
+}
+
+
+def amount_includes_currency(amount: str, currency: str) -> bool:
+    """True when *amount* already shows the same currency (code or symbol)."""
+    amt = amount.strip()
+    cur = currency.strip()
+    if not amt or not cur:
+        return False
+    if cur.upper() in amt.upper() or cur in amt:
+        return True
+    code = re.sub(r"[^A-Za-z]", "", cur).upper()
+    pattern = _CURRENCY_IN_AMOUNT.get(code)
+    if pattern and pattern.search(amt):
+        return True
+    if ("₪" in cur or code == "ILS") and "₪" in amt:
+        return True
+    if ("$" in cur or code == "USD") and "$" in amt:
+        return True
+    return bool(re.search(rf"(?:^|\s){re.escape(cur)}(?:\s|$)", amt, re.I))
+
+
+def compose_amount_with_currency(
+    amount: object | None,
+    currency: object | None,
+) -> str:
+    """Combine amount + currency once (avoid '2104.83 USD USD' / '₪4797 ILS')."""
+    amt = "" if amount is None else str(amount).strip()
+    cur = "" if currency is None else str(currency).strip()
+    if not amt and not cur:
+        return ""
+    if not amt:
+        return cur
+    if not cur:
+        return amt
+    if amount_includes_currency(amt, cur):
+        return amt
+    return f"{amt} {cur}"
+
 
 def parse_amount_value(raw: str | None) -> float | None:
     """Best-effort parse of a monetary string to float."""

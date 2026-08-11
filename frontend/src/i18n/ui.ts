@@ -86,11 +86,12 @@ export const UI: Record<Lang, Record<string, string>> = {
     settings_interval_1m: "Every 1 minute",
     settings_interval_2m: "Every 2 minutes",
     settings_done: "Done",
-    incoming_title: "Incoming document",
+    incoming_title: "New document",
     incoming_via: "Detected from {source}",
     incoming_source_desktop: "Desktop",
     incoming_source_drive: "Google Drive",
     incoming_source_whatsapp: "WhatsApp",
+    incoming_click_hint: "Tap to view processing",
   },
   he: {
     page_title: "ניתוח וקטלוג אוטומטי של מסמכים",
@@ -177,11 +178,12 @@ export const UI: Record<Lang, Record<string, string>> = {
     settings_interval_1m: "כל דקה",
     settings_interval_2m: "כל 2 דקות",
     settings_done: "סיום",
-    incoming_title: "מסמך נכנס",
+    incoming_title: "מסמך חדש",
     incoming_via: "זוהה מתוך {source}",
     incoming_source_desktop: "שולחן העבודה",
     incoming_source_drive: "Google Drive",
     incoming_source_whatsapp: "ווטסאפ",
+    incoming_click_hint: "לחצו לצפייה בעיבוד",
   },
 };
 
