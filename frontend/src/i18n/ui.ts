@@ -4,7 +4,7 @@ export const UI: Record<Lang, Record<string, string>> = {
   en: {
     page_title: "Automatic Document Analysis & Cataloging",
     brand: "Automatic Document Analysis & Cataloging",
-    brand_sub: "ניתוח וקטלוג אוטומטי של מסמכים",
+    brand_sub: "",
     value:
       "Documents land on your desktop, Google Drive, or WhatsApp. The tool detects them automatically and analyzes them — no manual work.",
     auto_run: "Analyze documents",
@@ -61,7 +61,7 @@ export const UI: Record<Lang, Record<string, string>> = {
     col_summary: "Summary",
     col_status: "Status",
     batch_table: "Batch overview",
-    footer_tech: "React · FastAPI · OpenAI · PyMuPDF · Pydantic V2",
+    footer_tech: "",
     footer_limits: "Max {max_files} files / {max_mb} MB · OCR for image PDFs",
     about: "",
     about_body: "",
@@ -152,7 +152,7 @@ export const UI: Record<Lang, Record<string, string>> = {
     col_summary: "סיכום",
     col_status: "סטטוס",
     batch_table: "סקירת האצווה",
-    footer_tech: "React · FastAPI · OpenAI · PyMuPDF · Pydantic V2",
+    footer_tech: "",
     footer_limits: "עד {max_files} קבצים / {max_mb} מ״ב · OCR לסריקות",
     about: "",
     about_body: "",
@@ -187,16 +187,42 @@ export const UI: Record<Lang, Record<string, string>> = {
 
 /** Friendly display names so built-in files don’t read as “sample_*”. */
 export const DISPLAY_FILENAMES: Record<string, { en: string; he: string }> = {
-  "sample_invoice_he.pdf": { en: "Invoice_NorTech.pdf", he: "חשבונית_נורתק.pdf" },
-  "sample_invoice_en.pdf": { en: "Invoice_Northwind.pdf", he: "חשבונית_Northwind.pdf" },
-  "sample_contract_he.pdf": { en: "Agreement_Services.pdf", he: "הסכם_שירותים.pdf" },
-  "sample_contract_en.pdf": { en: "Service_Agreement.pdf", he: "הסכם_שירותים_EN.pdf" },
-  "sample_receipt_he.pdf": { en: "Receipt_Cafe.pdf", he: "קבלה_קפה_הנמל.pdf" },
-  "sample_receipt_en.pdf": { en: "Receipt_Harbor.pdf", he: "קבלה_Harbor.pdf" },
-  "sample_quote_en.pdf": { en: "Quote_BrightOps.pdf", he: "הצעת_מחיר.pdf" },
-  "sample_purchase_order_en.pdf": { en: "PO_77801.pdf", he: "הזמנת_רכש.pdf" },
-  "sample_bank_statement_en.pdf": { en: "Bank_Statement_Mar2025.pdf", he: "דף_חשבון.pdf" },
+  // Hebrew docs (ILS · Hebrew content) — used only when UI lang is HE
+  "sample_invoice_he.pdf": { en: "חשבונית_נורתק.pdf", he: "חשבונית_נורתק.pdf" },
+  "sample_contract_he.pdf": { en: "הסכם_שירותים.pdf", he: "הסכם_שירותים.pdf" },
+  "sample_receipt_he.pdf": { en: "קבלה_קפה_הנמל.pdf", he: "קבלה_קפה_הנמל.pdf" },
+  // English docs (USD · English content) — used only when UI lang is EN
+  "sample_invoice_en.pdf": { en: "Invoice_Northwind.pdf", he: "Invoice_Northwind.pdf" },
+  "sample_contract_en.pdf": { en: "Service_Agreement.pdf", he: "Service_Agreement.pdf" },
+  "sample_receipt_en.pdf": { en: "Receipt_Harbor.pdf", he: "Receipt_Harbor.pdf" },
+  "sample_quote_en.pdf": { en: "Quote_BrightOps.pdf", he: "Quote_BrightOps.pdf" },
+  "sample_purchase_order_en.pdf": { en: "PO_77801.pdf", he: "PO_77801.pdf" },
+  "sample_bank_statement_en.pdf": {
+    en: "Bank_Statement_Mar2025.pdf",
+    he: "Bank_Statement_Mar2025.pdf",
+  },
 };
+
+/** Sample PDF locale from filename (`sample_*_en.pdf` / `sample_*_he.pdf`). */
+export function sampleFileLang(filename: string): Lang | null {
+  if (/_he\.pdf$/i.test(filename)) return "he";
+  if (/_en\.pdf$/i.test(filename)) return "en";
+  return null;
+}
+
+/** Demo PDFs for the active UI language only (EN → USD docs, HE → ILS docs). */
+export function demoSamplesForLang(lang: Lang): string[] {
+  return Object.keys(DISPLAY_FILENAMES).filter((f) => sampleFileLang(f) === lang);
+}
+
+/** Featured one-click demo document for the active language. */
+export function featuredSampleForLang(lang: Lang): string {
+  const preferred =
+    lang === "he" ? "sample_invoice_he.pdf" : "sample_invoice_en.pdf";
+  const list = demoSamplesForLang(lang);
+  if (list.includes(preferred)) return preferred;
+  return list[0] ?? preferred;
+}
 
 export const FIELD_LABELS: Record<string, [string, string]> = {
   vendor: ["Vendor", "ספק"],

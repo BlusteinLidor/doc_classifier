@@ -22,10 +22,8 @@ import { ResultLayout } from "./components/ResultLayout";
 import { TopBar } from "./components/TopBar";
 import { UploadZone } from "./components/UploadZone";
 import type { Lang } from "./i18n/ui";
-import { DISPLAY_FILENAMES, t } from "./i18n/ui";
+import { demoSamplesForLang, featuredSampleForLang, t } from "./i18n/ui";
 
-const FEATURED_DEFAULT = "sample_invoice_he.pdf";
-const DEMO_SAMPLES = Object.keys(DISPLAY_FILENAMES);
 const INCOMING_BANNER_MS = 2200;
 const FIRST_INCOMING_DELAY_MS = 2500;
 const SOURCES: IncomingSource[] = ["desktop", "drive", "whatsapp"];
@@ -33,7 +31,6 @@ const SOURCES: IncomingSource[] = ["desktop", "drive", "whatsapp"];
 export default function App() {
   const [lang, setLang] = useState<Lang>("he");
   const [scrolled, setScrolled] = useState(false);
-  const [featured, setFeatured] = useState(FEATURED_DEFAULT);
   const [maxFiles, setMaxFiles] = useState(3);
   const [maxMb, setMaxMb] = useState(5);
   const [busy, setBusy] = useState(false);
@@ -58,10 +55,13 @@ export default function App() {
   const processingRef = useRef(false);
   const pendingIncomingRef = useRef(false);
   const intervalMsRef = useRef<IncomingIntervalMs>(0);
+  const langRef = useRef<Lang>(lang);
   const scheduleTimerRef = useRef<number | null>(null);
   const bannerTimerRef = useRef<number | null>(null);
   const hasQueuedFirstRef = useRef(false);
   const runSampleRef = useRef<(name: string) => void>(() => undefined);
+
+  const featured = featuredSampleForLang(lang);
 
   useEffect(() => {
     busyRef.current = busy;
@@ -70,6 +70,12 @@ export default function App() {
   useEffect(() => {
     intervalMsRef.current = intervalMs;
   }, [intervalMs]);
+
+  useEffect(() => {
+    langRef.current = lang;
+    // Restart the language-scoped sample rotation when UI language changes
+    sampleIndexRef.current = 0;
+  }, [lang]);
 
   useEffect(() => {
     stageFileRef.current = stageFile;
@@ -91,7 +97,6 @@ export default function App() {
     void (async () => {
       try {
         const health = await fetchHealth();
-        setFeatured(health.featured_sample || FEATURED_DEFAULT);
         setMaxFiles(health.max_files);
         setMaxMb(health.max_mb);
       } catch {
@@ -233,9 +238,12 @@ export default function App() {
     }
 
     pendingIncomingRef.current = true;
-    const list = DEMO_SAMPLES.length > 0 ? DEMO_SAMPLES : [FEATURED_DEFAULT];
-    const name = list[sampleIndexRef.current % list.length];
-    sampleIndexRef.current = (sampleIndexRef.current + 1) % list.length;
+    const currentLang = langRef.current;
+    const list = demoSamplesForLang(currentLang);
+    const pool =
+      list.length > 0 ? list : [featuredSampleForLang(currentLang)];
+    const name = pool[sampleIndexRef.current % pool.length];
+    sampleIndexRef.current = (sampleIndexRef.current + 1) % pool.length;
     const source = SOURCES[Math.floor(Math.random() * SOURCES.length)];
 
     setIncoming({ filename: name, source });

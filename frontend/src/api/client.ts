@@ -55,8 +55,9 @@ export async function fetchHealth(): Promise<HealthInfo> {
   return res.json() as Promise<HealthInfo>;
 }
 
-export async function fetchSamples(): Promise<SampleMeta[]> {
-  const res = await fetch("/api/samples");
+export async function fetchSamples(lang?: "en" | "he"): Promise<SampleMeta[]> {
+  const qs = lang ? `?lang=${lang}` : "";
+  const res = await fetch(`/api/samples${qs}`);
   if (!res.ok) throw new Error("Failed to load samples");
   return res.json() as Promise<SampleMeta[]>;
 }

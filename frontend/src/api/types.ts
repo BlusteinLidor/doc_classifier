@@ -74,6 +74,7 @@ export type StreamEvent =
 export interface HealthInfo {
   status: string;
   featured_sample: string;
+  featured_samples?: { en: string; he: string };
   max_files: number;
   max_mb: number;
 }

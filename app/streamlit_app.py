@@ -50,83 +50,103 @@ logger = logging.getLogger(__name__)
 _SAMPLES_DIR = _ROOT / "samples"
 _MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
 _MAX_FILES_PER_RUN = 3
-_FEATURED_SAMPLE = "sample_invoice_he.pdf"
+_FEATURED_SAMPLE_EN = "sample_invoice_en.pdf"
+_FEATURED_SAMPLE_HE = "sample_invoice_he.pdf"
 
 # (filename, teaser_en, teaser_he, button_en, button_he, featured)
+# shown filtered by UI language: EN → English/USD docs, HE → Hebrew/ILS docs
 _SAMPLE_DOCS: list[tuple[str, str, str, str, str, bool]] = [
     (
         "sample_invoice_en.pdf",
         "USD totals · vendor & line items",
-        "סכומים בדולר · ספק ופריטים",
-        "English invoice",
-        "חשבונית אנגלית",
-        False,
+        "USD totals · vendor & line items",
+        "Invoice ⭐",
+        "Invoice ⭐",
+        True,
     ),
     (
         "sample_invoice_he.pdf",
         "₪ amounts · Hebrew vendor (featured)",
         "סכומים ₪ · ספק בעברית (מומלץ)",
-        "Hebrew invoice ⭐",
-        "חשבונית בעברית ⭐",
+        "חשבונית ⭐",
+        "חשבונית ⭐",
         True,
     ),
     (
         "sample_contract_en.pdf",
         "Two parties · governing law",
-        "שני צדדים · דין חל",
-        "English contract",
-        "חוזה באנגלית",
+        "Two parties · governing law",
+        "Service agreement",
+        "Service agreement",
         False,
     ),
     (
         "sample_contract_he.pdf",
         "Hebrew parties · key terms",
         "צדדים בעברית · תנאים עיקריים",
-        "Hebrew contract",
-        "חוזה בעברית",
+        "הסכם שירותים",
+        "הסכם שירותים",
         False,
     ),
     (
         "sample_receipt_en.pdf",
         "Merchant slip · payment method",
-        "קבלה · אמצעי תשלום",
-        "English receipt",
-        "קבלה באנגלית",
+        "Merchant slip · payment method",
+        "Receipt",
+        "Receipt",
         False,
     ),
     (
         "sample_receipt_he.pdf",
         "Hebrew merchant · ₪ total",
         "בית עסק בעברית · סה״כ ₪",
-        "Hebrew receipt",
-        "קבלה בעברית",
+        "קבלה",
+        "קבלה",
         False,
     ),
     (
         "sample_quote_en.pdf",
         "Proposal · validity period",
-        "הצעת מחיר · תוקף",
-        "English quote",
-        "הצעת מחיר באנגלית",
+        "Proposal · validity period",
+        "Quote",
+        "Quote",
         False,
     ),
     (
         "sample_purchase_order_en.pdf",
         "Buyer PO · line items",
-        "הזמנת רכש · פריטים",
-        "English purchase order",
-        "הזמנת רכש באנגלית",
+        "Buyer PO · line items",
+        "Purchase order",
+        "Purchase order",
         False,
     ),
     (
         "sample_bank_statement_en.pdf",
         "Period · balances & transactions",
-        "תקופה · יתרות ותנועות",
-        "English bank statement",
-        "דף חשבון באנגלית",
+        "Period · balances & transactions",
+        "Bank statement",
+        "Bank statement",
         False,
     ),
 ]
+
+
+def _sample_locale(filename: str) -> str | None:
+    name = filename.lower()
+    if name.endswith("_he.pdf"):
+        return "he"
+    if name.endswith("_en.pdf"):
+        return "en"
+    return None
+
+
+def _samples_for_ui_lang() -> list[tuple[str, str, str, str, str, bool]]:
+    lang = "he" if _is_he() else "en"
+    return [s for s in _SAMPLE_DOCS if _sample_locale(s[0]) == lang]
+
+
+def _featured_sample() -> str:
+    return _FEATURED_SAMPLE_HE if _is_he() else _FEATURED_SAMPLE_EN
 
 _UI: dict[str, dict[str, str]] = {
     "en": {
@@ -906,9 +926,10 @@ def _render_hero() -> None:
 
 
 def _render_sample_buttons() -> None:
+    samples = _samples_for_ui_lang()
     st.markdown(f"**{_t('samples_title')}**")
-    cols = st.columns(len(_SAMPLE_DOCS))
-    for col, sample in zip(cols, _SAMPLE_DOCS):
+    cols = st.columns(max(len(samples), 1))
+    for col, sample in zip(cols, samples):
         filename, teaser_en, teaser_he, btn_en, btn_he, featured = sample
         with col:
             label = btn_he if _is_he() else btn_en
@@ -1115,18 +1136,19 @@ def _render_footer() -> None:
 
 
 def _run_featured_demo() -> None:
-    """One-click featured sample (Hebrew invoice)."""
+    """One-click featured sample for the active UI language."""
+    featured = _featured_sample()
     try:
-        data = _load_sample(_FEATURED_SAMPLE)
+        data = _load_sample(featured)
     except FileNotFoundError:
         st.error(
-            f"Sample missing: {_FEATURED_SAMPLE}. "
+            f"Sample missing: {featured}. "
             "Regenerate with scripts/generate_samples.py."
         )
         return
     st.session_state["featured_prompt_dismissed"] = True
     with st.spinner(_t("running_demo")):
-        _process_file_list([(_FEATURED_SAMPLE, data)])
+        _process_file_list([(featured, data)])
     st.rerun()
 
 
@@ -1154,9 +1176,9 @@ def main() -> None:
         f1, f2 = st.columns([3, 1])
         with f1:
             st.info(
-                ("מומלץ: הרץ את חשבונית הדוגמה בעברית להדגמה מלאה.")
+                ("מומלץ: הרץ את חשבונית הדוגמה בעברית (₪) להדגמה מלאה.")
                 if _is_he()
-                else "Recommended: run the featured Hebrew invoice for a full demo."
+                else "Recommended: run the featured English invoice (USD) for a full demo."
             )
         with f2:
             if st.button(

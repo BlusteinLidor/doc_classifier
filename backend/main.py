@@ -7,10 +7,10 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Literal
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -37,34 +37,38 @@ _SAMPLES_DIR = _ROOT / "samples"
 _FRONTEND_DIST = _ROOT / "frontend" / "dist"
 _MAX_FILE_BYTES = 5 * 1024 * 1024  # 5 MB
 _MAX_FILES_PER_RUN = 3
-_FEATURED_SAMPLE = "sample_invoice_he.pdf"
+_FEATURED_SAMPLE_EN = "sample_invoice_en.pdf"
+_FEATURED_SAMPLE_HE = "sample_invoice_he.pdf"
+# Back-compat default (health still exposes a single field)
+_FEATURED_SAMPLE = _FEATURED_SAMPLE_HE
 
 # filename, teaser_en, teaser_he, label_en, label_he, featured, kind
+# featured=True marks locale-default invoice (app picks by UI language)
 _SAMPLE_DOCS: list[tuple[str, str, str, str, str, bool, str]] = [
     (
         "sample_invoice_en.pdf",
         "USD totals · vendor & line items",
-        "סכומים בדולר · ספק ופריטים",
-        "English invoice",
-        "חשבונית אנגלית",
-        False,
+        "USD totals · vendor & line items",
+        "Invoice",
+        "Invoice",
+        True,
         "invoice",
     ),
     (
         "sample_invoice_he.pdf",
         "₪ amounts · Hebrew vendor",
         "סכומים ₪ · ספק בעברית",
-        "Hebrew invoice",
-        "חשבונית בעברית",
+        "חשבונית",
+        "חשבונית",
         True,
         "invoice",
     ),
     (
         "sample_contract_en.pdf",
         "Two parties · governing law",
-        "שני צדדים · דין חל",
-        "English contract",
-        "חוזה באנגלית",
+        "Two parties · governing law",
+        "Service agreement",
+        "Service agreement",
         False,
         "contract",
     ),
@@ -72,17 +76,17 @@ _SAMPLE_DOCS: list[tuple[str, str, str, str, str, bool, str]] = [
         "sample_contract_he.pdf",
         "Hebrew parties · key terms",
         "צדדים בעברית · תנאים עיקריים",
-        "Hebrew contract",
-        "חוזה בעברית",
+        "הסכם שירותים",
+        "הסכם שירותים",
         False,
         "contract",
     ),
     (
         "sample_receipt_en.pdf",
         "Merchant slip · payment method",
-        "קבלה · אמצעי תשלום",
-        "English receipt",
-        "קבלה באנגלית",
+        "Merchant slip · payment method",
+        "Receipt",
+        "Receipt",
         False,
         "receipt",
     ),
@@ -90,35 +94,35 @@ _SAMPLE_DOCS: list[tuple[str, str, str, str, str, bool, str]] = [
         "sample_receipt_he.pdf",
         "Hebrew merchant · ₪ total",
         "בית עסק בעברית · סה״כ ₪",
-        "Hebrew receipt",
-        "קבלה בעברית",
+        "קבלה",
+        "קבלה",
         False,
         "receipt",
     ),
     (
         "sample_quote_en.pdf",
         "Proposal · validity period",
-        "הצעת מחיר · תוקף",
-        "English quote",
-        "הצעת מחיר באנגלית",
+        "Proposal · validity period",
+        "Quote",
+        "Quote",
         False,
         "quote",
     ),
     (
         "sample_purchase_order_en.pdf",
         "Buyer PO · line items",
-        "הזמנת רכש · פריטים",
-        "English purchase order",
-        "הזמנת רכש באנגלית",
+        "Buyer PO · line items",
+        "Purchase order",
+        "Purchase order",
         False,
         "purchase_order",
     ),
     (
         "sample_bank_statement_en.pdf",
         "Period · balances & transactions",
-        "תקופה · יתרות ותנועות",
-        "English bank statement",
-        "דף חשבון באנגלית",
+        "Period · balances & transactions",
+        "Bank statement",
+        "Bank statement",
         False,
         "bank_statement",
     ),
@@ -158,19 +162,33 @@ app.add_middleware(
 )
 
 
-def _sample_meta_list() -> list[SampleMeta]:
-    return [
-        SampleMeta(
-            filename=fn,
-            teaser_en=te_en,
-            teaser_he=te_he,
-            label_en=lb_en,
-            label_he=lb_he,
-            featured=feat,
-            kind=kind,
+def _sample_locale(filename: str) -> str | None:
+    name = filename.lower()
+    if name.endswith("_he.pdf"):
+        return "he"
+    if name.endswith("_en.pdf"):
+        return "en"
+    return None
+
+
+def _sample_meta_list(lang: Literal["en", "he"] | None = None) -> list[SampleMeta]:
+    rows: list[SampleMeta] = []
+    for fn, te_en, te_he, lb_en, lb_he, feat, kind in _SAMPLE_DOCS:
+        locale = _sample_locale(fn)
+        if lang is not None and locale is not None and locale != lang:
+            continue
+        rows.append(
+            SampleMeta(
+                filename=fn,
+                teaser_en=te_en,
+                teaser_he=te_he,
+                label_en=lb_en,
+                label_he=lb_he,
+                featured=feat,
+                kind=kind,
+            )
         )
-        for fn, te_en, te_he, lb_en, lb_he, feat, kind in _SAMPLE_DOCS
-    ]
+    return rows
 
 
 def _load_sample(filename: str) -> bytes:
@@ -299,14 +317,23 @@ def health() -> dict[str, Any]:
     return {
         "status": "ok",
         "featured_sample": _FEATURED_SAMPLE,
+        "featured_samples": {
+            "en": _FEATURED_SAMPLE_EN,
+            "he": _FEATURED_SAMPLE_HE,
+        },
         "max_files": _MAX_FILES_PER_RUN,
         "max_mb": _MAX_FILE_BYTES // (1024 * 1024),
     }
 
 
 @app.get("/api/samples", response_model=list[SampleMeta])
-def list_samples() -> list[SampleMeta]:
-    return _sample_meta_list()
+def list_samples(
+    lang: Literal["en", "he"] | None = Query(
+        default=None,
+        description="When set, return only samples for that demo locale (en=USD, he=ILS).",
+    ),
+) -> list[SampleMeta]:
+    return _sample_meta_list(lang)
 
 
 @app.get("/api/samples/{filename}")

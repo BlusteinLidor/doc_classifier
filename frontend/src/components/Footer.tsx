@@ -8,12 +8,17 @@ interface Props {
 }
 
 export function Footer({ lang, maxFiles, maxMb }: Props) {
+  const tech = t(lang, "footer_tech");
   return (
     <footer className="footer">
       <p>
         {t(lang, "footer_limits", { max_files: maxFiles, max_mb: maxMb })}
-        <br />
-        {t(lang, "footer_tech")}
+        {tech ? (
+          <>
+            <br />
+            {tech}
+          </>
+        ) : null}
       </p>
     </footer>
   );
