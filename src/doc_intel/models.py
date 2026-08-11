@@ -129,7 +129,11 @@ class ContractExtraction(BaseModel):
     auto_renewal: str | None = None
     key_terms_summary: str | None = Field(
         default=None,
-        description="Brief summary of main obligations or terms.",
+        description=(
+            "Brief summary of main obligations or terms, written entirely in the "
+            "document's primary language: English only for English contracts; Hebrew "
+            "only for Hebrew contracts. Do not translate English documents into Hebrew."
+        ),
     )
     confidence_notes: str | None = None
 

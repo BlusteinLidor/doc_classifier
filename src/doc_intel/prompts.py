@@ -5,6 +5,16 @@ from __future__ import annotations
 SYSTEM_SHARED = """You are a document extraction assistant for business documents.
 Rules:
 - Preserve all text in the original language and script exactly as in the source (especially Hebrew). Do not transliterate Hebrew to Latin.
+- CRITICAL language rule for ALL free-text / summary fields (key_terms_summary, summary,
+  reason, confidence_notes, payment_terms, duration_or_term, auto_renewal, subject,
+  governing_law, titles paraphrases, and any other narrative field):
+  * Detect the document's primary language from the body text.
+  * English document (no meaningful Hebrew body text) → write those fields entirely in
+    English. Do not translate into Hebrew. Do not invent Hebrew text for English sources.
+  * Hebrew document (Hebrew letters in the body) → write those fields entirely in Hebrew.
+  * Never mix languages in a single free-text field. Never translate the source into the
+    other language.
+  * Proper names, company names, addresses, IDs, and amounts stay as printed in the source.
 - Recognize Israeli locale: ILS, ₪, מע״מ, ח.פ., ע.מ., and Hebrew date phrases when present.
 - If a field is not found, use null or omit optional fields; do not invent data.
 - When dates are clear, also fill ISO fields (YYYY-MM-DD) when the schema includes them.
@@ -77,7 +87,8 @@ Extract credit note fields. Capture original invoice reference and credit reason
 """
 
 SYSTEM_CONTRACT = SYSTEM_SHARED + """
-Extract contract fields. Summarize key terms briefly in the original language when possible.
+Extract contract fields. Summarize key_terms_summary briefly in the same language as the
+document body: English source → English summary only; Hebrew source → Hebrew summary only.
 Include contract number, payment terms, duration, and auto-renewal if present.
 """
 
@@ -131,6 +142,9 @@ Full document text:
 ---
 {text}
 ---
+
+Language of free-text fields must match the document body above:
+Hebrew body → Hebrew free-text; English body → English free-text only (no Hebrew).
 """
 
 SYSTEM_OCR = """You OCR business document page images.
