@@ -9,6 +9,8 @@ Rules:
 - If a field is not found, use null or omit optional fields; do not invent data.
 - When dates are clear, also fill ISO fields (YYYY-MM-DD) when the schema includes them.
 - When amounts are clear, also fill numeric amount fields when the schema includes them.
+- Put currency only once: use a total_amount without a trailing currency code if a separate
+  currency field exists (e.g. total_amount "2,104.83" + currency "USD", not "2,104.83 USD").
 - Output must match the provided structured schema exactly.
 """
 
@@ -41,9 +43,17 @@ Choose the best-fit type. Prefer a specific type over "other". Prefer "other" ov
 when the text is readable business content. Use "unknown" only when content is unusable
 or clearly not a business document. Use only the excerpt provided.
 Include a short confidence_note (1–2 sentences) explaining the choice.
-Language for confidence_note: write it entirely in the primary language of the document text
-(Hebrew documents → full Hebrew note; English documents → English note). Do not answer in
-English when the excerpt is mainly Hebrew.
+
+CRITICAL language rule for confidence_note:
+- If the excerpt contains Hebrew letters (even mixed with English brand names), write the
+  confidence_note entirely in Hebrew — full sentences in Hebrew script.
+- Only write the confidence_note in English when the excerpt is almost entirely English
+  with no meaningful Hebrew body text.
+- Never mix: do not output an English explanation under a Hebrew UI label. One language only.
+Examples (Hebrew doc):
+  "זהו מסמך חשבונית מס עם סכום לתשלום ומע״מ, ולכן מסווג כחשבונית."
+Examples (English doc):
+  "This is a tax invoice with a total due and VAT line, so it classifies as an invoice."
 """
 
 USER_CLASSIFY_TEMPLATE = """Filename: {filename}
@@ -52,6 +62,9 @@ Document excerpt:
 ---
 {text_excerpt}
 ---
+
+Respond with kind + confidence_note. confidence_note language must match the excerpt:
+Hebrew excerpt → Hebrew note; English excerpt → English note.
 """
 
 SYSTEM_INVOICE = SYSTEM_SHARED + """

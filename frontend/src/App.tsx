@@ -25,7 +25,7 @@ import type { Lang } from "./i18n/ui";
 import { demoSamplesForLang, featuredSampleForLang, t } from "./i18n/ui";
 
 const INCOMING_BANNER_MS = 2800;
-const TOAST_AFTER_START_MS = 5200;
+const TOAST_DISMISS_AFTER_DONE_MS = 4500;
 const FIRST_INCOMING_DELAY_MS = 2500;
 const SOURCES: IncomingSource[] = ["desktop", "drive", "whatsapp"];
 
@@ -65,6 +65,7 @@ export default function App() {
   const runSampleRef = useRef<(name: string) => void>(() => undefined);
   const followNewDocRef = useRef(false);
   const resultsLenRef = useRef(0);
+  const keepToastRef = useRef(false);
 
   const featured = featuredSampleForLang(lang);
 
@@ -223,6 +224,17 @@ export default function App() {
       } finally {
         setBusy(false);
         processingRef.current = false;
+        // Keep the "new document" toast until processing finishes (for video demos)
+        if (keepToastRef.current) {
+          keepToastRef.current = false;
+          if (toastHideTimerRef.current != null) {
+            window.clearTimeout(toastHideTimerRef.current);
+          }
+          toastHideTimerRef.current = window.setTimeout(() => {
+            toastHideTimerRef.current = null;
+            setIncoming(null);
+          }, TOAST_DISMISS_AFTER_DONE_MS);
+        }
       }
     },
     [handleStreamEvent],
@@ -303,15 +315,13 @@ export default function App() {
     setIncoming({ filename: name, source });
     setSettingsOpen(false);
     clearToastTimers();
+    keepToastRef.current = true;
+    followNewDocRef.current = true; // auto-scroll to processing for demos
 
-    // Brief “detected” beat, then start processing while toast remains clickable
+    // Brief “detected” beat, then start processing; toast stays until done
     bannerTimerRef.current = window.setTimeout(() => {
       bannerTimerRef.current = null;
       runSampleRef.current(name);
-      toastHideTimerRef.current = window.setTimeout(() => {
-        toastHideTimerRef.current = null;
-        setIncoming(null);
-      }, TOAST_AFTER_START_MS);
     }, INCOMING_BANNER_MS);
   }, [clearToastTimers]);
 

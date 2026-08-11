@@ -19,12 +19,69 @@ _amount_chunk_re = re.compile(r"[-+]?(?:\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d+)?|\d+(
 _ISO_SUFFIX = "_iso"
 _VALUE_SUFFIX = "_value"
 
+_SYMBOL_BY_CODE = {
+    "USD": "$",
+    "ILS": "₪",
+    "EUR": "€",
+    "GBP": "£",
+}
+
 _CURRENCY_IN_AMOUNT: dict[str, re.Pattern[str]] = {
     "USD": re.compile(r"\$|USD|US\$", re.I),
     "ILS": re.compile(r"₪|ILS|NIS|ש[\"״']?\s*ח", re.I),
     "EUR": re.compile(r"€|EUR", re.I),
     "GBP": re.compile(r"£|GBP", re.I),
 }
+
+_CURRENCY_TOKEN_RE = re.compile(
+    r"₪|\$|€|£|\bUSD\b|\bUS\$\b|\bILS\b|\bNIS\b|\bEUR\b|\bGBP\b|ש[\"״']?\s*ח",
+    re.I,
+)
+
+_MONEY_AMOUNT_KEYS = (
+    "total_amount",
+    "amount_due",
+    "amount",
+    "subtotal",
+    "tax_amount",
+    "net_pay",
+    "gross_pay",
+    "closing_balance",
+    "opening_balance",
+    "unit_price",
+    "line_total",
+)
+
+
+def detect_currency_code(*texts: object | None) -> str | None:
+    """Best-effort currency code from free text."""
+    for raw in texts:
+        if raw is None:
+            continue
+        text = str(raw).strip()
+        if not text:
+            continue
+        if "₪" in text or re.search(r"\bILS\b|\bNIS\b|ש[\"״']?\s*ח", text, re.I):
+            return "ILS"
+        if "$" in text or re.search(r"\bUSD\b|\bUS\$\b", text, re.I):
+            return "USD"
+        if "€" in text or re.search(r"\bEUR\b", text, re.I):
+            return "EUR"
+        if "£" in text or re.search(r"\bGBP\b", text, re.I):
+            return "GBP"
+        code = re.sub(r"[^A-Za-z]", "", text).upper()
+        if code in _SYMBOL_BY_CODE:
+            return code
+    return None
+
+
+def strip_currency_markers(amount: str) -> str:
+    """Remove currency symbols/codes; collapse whitespace."""
+    cleaned = _CURRENCY_TOKEN_RE.sub(" ", amount)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    # Clean trailing/leading punctuation left after stripping codes
+    cleaned = cleaned.strip(" ·-/")
+    return cleaned
 
 
 def amount_includes_currency(amount: str, currency: str) -> bool:
@@ -35,7 +92,7 @@ def amount_includes_currency(amount: str, currency: str) -> bool:
         return False
     if cur.upper() in amt.upper() or cur in amt:
         return True
-    code = re.sub(r"[^A-Za-z]", "", cur).upper()
+    code = re.sub(r"[^A-Za-z]", "", cur).upper() or detect_currency_code(cur) or ""
     pattern = _CURRENCY_IN_AMOUNT.get(code)
     if pattern and pattern.search(amt):
         return True
@@ -46,36 +103,42 @@ def amount_includes_currency(amount: str, currency: str) -> bool:
     return bool(re.search(rf"(?:^|\s){re.escape(cur)}(?:\s|$)", amt, re.I))
 
 
-def compose_amount_with_currency(
+def format_money_display(
     amount: object | None,
-    currency: object | None,
+    currency: object | None = None,
 ) -> str:
-    """Combine amount + currency once (avoid '2104.83 USD USD' / '₪4797 ILS')."""
+    """
+    Single clean money string — prefer symbol once (e.g. ₪4,797 or $2,104.83).
+    Never emits 'USD USD' or '₪4797 ILS'.
+    """
     amt = "" if amount is None else str(amount).strip()
     cur = "" if currency is None else str(currency).strip()
     if not amt and not cur:
         return ""
-    if not amt:
-        return cur
-    if not cur:
-        return amt
-    if amount_includes_currency(amt, cur):
-        return amt
-    return f"{amt} {cur}"
+    code = detect_currency_code(cur, amt)
+    num = strip_currency_markers(amt) if amt else ""
+    if not num:
+        return _SYMBOL_BY_CODE.get(code or "", code or cur)
+    if code and code in _SYMBOL_BY_CODE:
+        return f"{_SYMBOL_BY_CODE[code]}{num}"
+    if code:
+        return f"{num} {code}"
+    return num
+
+
+def compose_amount_with_currency(
+    amount: object | None,
+    currency: object | None,
+) -> str:
+    """Combine amount + currency once (prefer symbol form)."""
+    return format_money_display(amount, currency)
 
 
 def parse_amount_value(raw: str | None) -> float | None:
     """Best-effort parse of a monetary string to float."""
     if not raw or not str(raw).strip():
         return None
-    text = (
-        str(raw)
-        .strip()
-        .replace("₪", "")
-        .replace("$", "")
-        .replace("€", "")
-        .replace("£", "")
-    )
+    text = strip_currency_markers(str(raw).strip())
     chunks = list(_amount_chunk_re.finditer(text))
     if not chunks:
         return None
@@ -163,9 +226,45 @@ def _fill_iso_and_amounts(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _normalize_money_display(data: dict[str, Any]) -> dict[str, Any]:
+    """Rewrite money strings so currency appears once (prefer symbol form)."""
+    code = detect_currency_code(
+        data.get("currency"),
+        *(data.get(k) for k in _MONEY_AMOUNT_KEYS if data.get(k) is not None),
+    )
+    if code:
+        data["currency"] = code
+
+    for key in _MONEY_AMOUNT_KEYS:
+        if key not in data or data[key] is None:
+            continue
+        raw = data[key]
+        if not isinstance(raw, (str, int, float)):
+            continue
+        data[key] = format_money_display(raw, code or data.get("currency"))
+
+    # Nested line items / named amounts
+    for list_key in ("line_items", "items", "deductions", "amounts_mentioned"):
+        rows = data.get(list_key)
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            for cell in ("unit_price", "line_total", "amount", "total"):
+                if row.get(cell) is not None and isinstance(
+                    row[cell], (str, int, float)
+                ):
+                    row[cell] = format_money_display(
+                        row[cell], code or data.get("currency")
+                    )
+    return data
+
+
 def normalize_structured(obj: StructuredExtraction) -> StructuredExtraction:
     """Fill numeric amount and ISO date fields when missing and parseable."""
     if not isinstance(obj, BaseModel):
         return obj
     data = _fill_iso_and_amounts(obj.model_dump())
+    data = _normalize_money_display(data)
     return type(obj).model_validate(data)  # type: ignore[return-value]

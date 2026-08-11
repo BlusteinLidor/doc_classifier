@@ -323,6 +323,8 @@ def health() -> dict[str, Any]:
         },
         "max_files": _MAX_FILES_PER_RUN,
         "max_mb": _MAX_FILE_BYTES // (1024 * 1024),
+        # Bumped when shipping UI fixes so we can confirm Railway rebuilt
+        "app_rev": "stack-toast-money-v3",
     }
 
 

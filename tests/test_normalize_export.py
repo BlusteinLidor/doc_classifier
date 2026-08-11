@@ -73,21 +73,49 @@ def test_parse_date_iso(raw: str | None, expected: str | None) -> None:
 @pytest.mark.parametrize(
     "amount,currency,expected",
     [
-        ("2104.83 USD", "USD", "2104.83 USD"),
-        ("2104.83", "USD", "2104.83 USD"),
+        ("2104.83 USD", "USD", "$2104.83"),
+        ("2104.83", "USD", "$2104.83"),
         ("₪4797", "ILS", "₪4797"),
-        ("4797 ILS", "ILS", "4797 ILS"),
-        ("4797", "ILS", "4797 ILS"),
+        ("4797 ILS", "ILS", "₪4797"),
+        ("4797", "ILS", "₪4797"),
         ("$100", "USD", "$100"),
         ("100", None, "100"),
-        (None, "USD", "USD"),
+        (None, "USD", "$"),
         ("", "", ""),
+        ("2104.83 USD USD", "USD", "$2104.83"),
+        ("₪4,797 ILS", "ILS", "₪4,797"),
     ],
 )
 def test_compose_amount_with_currency(
     amount: str | None, currency: str | None, expected: str
 ) -> None:
     assert compose_amount_with_currency(amount, currency) == expected
+
+
+def test_normalize_rewrites_money_without_double_currency() -> None:
+    inv = normalize_structured(
+        InvoiceExtraction(
+            vendor="Acme",
+            total_amount="2,104.83 USD",
+            currency="USD",
+            invoice_date="15/03/2025",
+        )
+    )
+    assert isinstance(inv, InvoiceExtraction)
+    assert inv.total_amount == "$2,104.83"
+    assert inv.currency == "USD"
+    assert inv.total_amount_value == pytest.approx(2104.83)
+
+    he = normalize_structured(
+        InvoiceExtraction(
+            vendor="נורתק",
+            total_amount="₪4,797 ILS",
+            currency="ILS",
+        )
+    )
+    assert isinstance(he, InvoiceExtraction)
+    assert he.total_amount == "₪4,797"
+    assert he.currency == "ILS"
 
 
 def test_normalize_invoice_fills_numeric_and_iso() -> None:

@@ -193,15 +193,23 @@ export function ResultLayout({
                 </div>
                 {r.classification_confidence_note && (
                   <div
-                    className="info-box"
+                    className="info-box confidence-note"
                     dir={
-                      looksHebrew(r.classification_confidence_note) ? "rtl" : "auto"
+                      looksHebrew(r.classification_confidence_note) ? "rtl" : "ltr"
+                    }
+                    lang={
+                      looksHebrew(r.classification_confidence_note) ? "he" : "en"
                     }
                   >
-                    <span dir={lang === "he" ? "rtl" : "ltr"}>
-                      {t(lang, "confidence")}:{" "}
-                    </span>
-                    {r.classification_confidence_note}
+                    <div
+                      className="confidence-note-label"
+                      dir={lang === "he" ? "rtl" : "ltr"}
+                    >
+                      {t(lang, "confidence")}
+                    </div>
+                    <div className="confidence-note-body">
+                      {r.classification_confidence_note}
+                    </div>
                   </div>
                 )}
                 <div style={{ marginBottom: "0.75rem" }}>
